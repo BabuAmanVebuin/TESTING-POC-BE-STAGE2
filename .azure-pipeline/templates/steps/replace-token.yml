@@ -1,0 +1,19 @@
+parameters:
+  - name: environment # name of the parameter; required
+    type: string      # data type of the parameter; required
+    default: false
+
+steps:
+  - task: replacetokens@3
+    displayName: Replace deployment manifest tokens
+    inputs:
+      rootDirectory: '$(System.DefaultWorkingDirectory)/${{ parameters.environment }}/'
+      targetFiles: '**/*.yml'
+      encoding: 'auto'
+      writeBOM: true
+      actionOnMissing: 'warn'
+      keepToken: false
+      tokenPrefix: '#{'
+      tokenSuffix: '}#'
+      useLegacyPattern: false
+      enableTelemetry: true

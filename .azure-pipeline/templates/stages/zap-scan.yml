@@ -1,0 +1,97 @@
+parameters:
+  - name: zap_clusterName
+    type: string
+
+  - name: zap_resourceGroup
+    type: string
+
+  - name: zap_scanUrl
+    type: string
+
+  - name: zap_nameSpace
+    type: string
+
+stages:
+  - stage: Scan
+    pool:
+      name: $(agentPool)
+      demands:
+        - Agent.Name -equals $(agentType)-$(Build.BuildId)
+    jobs:
+      - job: Scan
+        displayName: ZAP scan
+        steps:
+          - checkout: self
+
+        - task: AzureCLI@2
+          inputs:
+            azureSubscription: 'JERADevOps'
+            scriptType: 'bash'
+            scriptLocation: 'inlineScript'
+            inlineScript: 'az aks get-credentials --name ${{ parameters.zap_clusterName }} --resource-group ${{ parameters.zap_resourceGroup }} --admin'
+
+        - task: Bash@3
+          displayName: 'Apply deployment'
+          inputs:
+            targetType: 'inline'
+            script: |
+              kubectl delete deploy zap -n ${{ parameters.zap_nameSpace }} --force --grace-period=0 --wait=true
+              echo "Waiting for a pod to be deleted..."
+              kubectl wait pod -n ${{ parameters.zap_nameSpace }} -l app=zap --for=delete --timeout 120s
+
+              kubectl apply -f .azure-pipeline/assets/zap-deployment.yaml -n ${{ parameters.zap_nameSpace }} --wait=true
+
+        - task: Bash@3
+          displayName: 'Get pod name'
+          inputs:
+            targetType: 'inline'
+            script: |
+              POD=$(kubectl get pods -n ${{ parameters.zap_nameSpace }} -l app=zap --sort-by=.metadata.creationTimestamp -o jsonpath="{.items[-1].metadata.name}")
+              echo $POD
+
+        - task: Bash@3
+          displayName: 'Wait for pod to be ready'
+          inputs:
+            targetType: 'inline'
+            script: |
+              while true
+                do
+                echo "Waiting for a pod to be ready..."
+                kubectl wait pod -n ${{ parameters.zap_nameSpace }} -l app=zap --for condition=ready --timeout 120s && break
+              sleep 1
+              done
+
+        - task: Bash@3
+          displayName: 'Validate pod status'
+          inputs:
+            targetType: 'inline'
+            script: |
+              POD=$(kubectl get pods -n ${{ parameters.zap_nameSpace }} -l app=zap --sort-by=.metadata.creationTimestamp -o jsonpath="{.items[-1].metadata.name}")          
+              STATUS=$(kubectl get pods $POD --no-headers -o custom-columns=":status.phase" -n ${{ parameters.zap_nameSpace }})
+              echo $STATUS
+                if [[ $STATUS == "Running"  ]]; 
+                    then
+                          echo "ZAP server pod is deployed successfully"
+                    else
+                          echo "ZAP server pod deployment failed"
+                      exit 1
+                    fi
+
+        - task: Bash@3
+          displayName: 'Exec into POD and Display report'
+          inputs:
+            targetType: 'inline'
+            script: |
+              POD=$(kubectl get pods -n ${{ parameters.zap_nameSpace }} -l app=zap --sort-by=.metadata.creationTimestamp -o jsonpath="{.items[-1].metadata.name}")
+              echo $POD
+              kubectl exec -it $POD -n ${{ parameters.zap_nameSpace }} -- /bin/sh -c "zap-baseline.py -t ${{ parameters.zap_scanUrl }} > OWASP-ZAP-Report.xml;"
+              kubectl exec -i $POD -n ${{ parameters.zap_nameSpace }} -- /bin/sh -c "cat OWASP-ZAP-Report.xml" > report.xml
+              pwd
+              ls
+
+        - task: CmdLine@2
+          displayName: Display report content
+          inputs:
+            script: |
+              ls -la .
+              echo "$(cat report.xml)"

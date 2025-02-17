@@ -1,0 +1,26 @@
+[
+  {
+    "USER_ID": "test1@user.com",
+    "PLANT_ID": "XX_",
+    "ASSET_TASK_GROUP_ID": 6,
+    "TEAM_ID": 21
+  },
+  {
+    "USER_ID": "test2@user.com",
+    "PLANT_ID": "XX_",
+    "ASSET_TASK_GROUP_ID": 6,
+    "TEAM_ID": 21
+  },
+  {
+    "USER_ID": "test3@user.com",
+    "PLANT_ID": "XX_",
+    "ASSET_TASK_GROUP_ID": 6,
+    "TEAM_ID": 21
+  },
+  {
+    "USER_ID": "test4@user.com",
+    "PLANT_ID": "HE_",
+    "ASSET_TASK_GROUP_ID": 1,
+    "TEAM_ID": 1
+  }
+]

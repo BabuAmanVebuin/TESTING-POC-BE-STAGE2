@@ -1,0 +1,75 @@
+parameters:
+  - name: stage
+    type: string
+
+  - name: token
+    type: string
+
+  - name: username
+    type: string
+
+  - name: password
+    type: string
+
+  - name: resultScanUrl
+    type: string
+
+  - name: projectKey
+    type: string
+
+  - name: projectName
+    type: string
+
+  - name: aksName
+    type: string
+
+  - name: azureResourceGroup
+    type: string
+
+steps:
+  - task: AzureCLI@2
+    inputs:
+      azureSubscription: 'JERADevOps'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: 'az aks get-credentials --name ${{ parameters.aksName }} --resource-group ${{ parameters.azureResourceGroup }} --admin'
+
+  - task: SonarQubePrepare@4
+    condition: contains(variables['Build.SourceBranch'], 'refs/heads/master')
+    displayName: 'Prepare analysis on SonarQube'
+    inputs:
+      SonarQube: 'SonarQube'
+      scannerMode: 'CLI'
+      configMode: 'manual'
+      cliProjectKey: ${{ parameters.projectKey }}
+      cliProjectName: ${{ parameters.projectName }}
+      cliSources: '.'
+      extraProperties: |
+        sonar.javascript.coveragePlugin=lcov
+        sonar.javascript.lcov.reportPaths=coverage/lcov.info
+
+  - task: SonarQubeAnalyze@4
+    condition: contains(variables['Build.SourceBranch'], 'refs/heads/master')
+    displayName: 'Run Code Analysis'
+
+  - task: SonarQubePublish@4
+    condition: contains(variables['Build.SourceBranch'], 'refs/heads/master')
+    displayName: 'Publish Code Quality Gate Result '
+    inputs:
+      pollingTimeoutSec: '300'
+
+  - task: Bash@3
+    condition: contains(variables['Build.SourceBranch'], 'refs/heads/master')
+    displayName: Get project scan status
+    inputs:
+      targetType: 'inline'
+      script: |
+        VAR=$(curl -u ${{ parameters.username }}:${{ parameters.password }} -X GET https://sonar.jera.co.jp/api/qualitygates/project_status\?projectKey=${{ parameters.projectName }}  | jq -r '.projectStatus.status')
+        echo $VAR
+        if [ "$VAR" == "OK" ]
+        then
+          echo "Your scan is successful"
+        else
+          echo "Your scan has failed , please check the report and fix the issues"
+          exit 1
+        fi

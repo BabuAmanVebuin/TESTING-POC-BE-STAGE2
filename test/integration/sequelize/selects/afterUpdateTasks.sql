@@ -1,0 +1,1 @@
+SELECT REMARKS FROM t_task WHERE TASK_ID = :taskId;

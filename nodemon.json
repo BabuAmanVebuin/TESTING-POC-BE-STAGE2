@@ -1,0 +1,5 @@
+{
+  "ignore": [".git", "node_modules/"],
+  "watch": ["index.ts", "src/"],
+  "ext": "ts"
+}

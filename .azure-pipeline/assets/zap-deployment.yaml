@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: zap
+  name: zap
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zap
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: zap
+    spec:
+      containers:
+      - image: owasp/zap2docker-stable:latest
+        name: zap2docker-stable
+        command: ['/bin/bash' , "-c"]
+        args:
+          - echo starting;
+            true;
+            while true; do sleep 30; done;

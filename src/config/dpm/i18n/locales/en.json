@@ -1,0 +1,45 @@
+{
+  "FIELD": {
+    "PLANT_CODE": "Plant code",
+    "PLANT_NAME": "Plant name",
+    "UNIT_CODE": "Unit code",
+    "UNIT_NAME": "Unit name",
+    "FISCAL_YEAR": "Fiscal year",
+    "FORECAST_CATEGORY": "Forecast category",
+    "STARTUP_MODE": "Startup mode",
+    "EPOCH_SECONDS": "Epoch Seconds",
+    "DEFECT_ID": "Defect Id"
+  },
+  "VALUE": {
+    "PREFIX_YEN": "¥",
+    "SUFFIX_HRS": "Hrs",
+    "SUFFIX_OKU": "Oku",
+    "SUFFIX_YEN_KWH": "YEN/kWh",
+    "SUFFIX_MAN": "Man",
+    "COLD": "COLD",
+    "COLD_1": "COLD Ⅰ",
+    "COLD_2": "COLD Ⅱ",
+    "COLD_3": "COLD Ⅲ",
+    "HOT": "HOT",
+    "HOT_1": "HOT Ⅰ",
+    "HOT_2": "HOT Ⅱ",
+    "VERY_HOT": "VERY HOT",
+    "WARM": "WARM",
+    "WARM_1": "WARM Ⅰ",
+    "WARM_2": "WARM Ⅱ",
+    "SUFFIX_PERCENTAGE": "%",
+    "GWH": "GWh",
+    "MWH": "MWh",
+    "SUFFIX_KJ_KWh":"KJ/KWh"
+  },
+  "ERROR": {
+    "NO_DATA_FOUND": "No data found.",
+    "INVALID": "ApplicationError: {{fieldName}} \"{{value}}\" is invalid!",
+    "INVALID_FOR": "ApplicationError: {{fieldName}} \"{{value}}\" is invalid for the {{forFieldName}} \"{{forFieldValue}}\"!",
+    "INTERNAL_SERVER": "Internal Server Error.",
+    "USER_ID_NOT_FOUND": "Not Found - User id was not found."
+  },
+  "MESSAGE": {
+    "SUCCESS": "Success"
+  }
+}

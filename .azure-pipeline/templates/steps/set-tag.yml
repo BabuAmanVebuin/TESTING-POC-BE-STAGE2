@@ -1,0 +1,31 @@
+steps:
+  - task: CmdLine@2
+    displayName: SET PR COMMIT
+    condition: and(eq(variables['Build.Reason'], 'PullRequest'),eq(variables['System.PullRequest.TargetBranch'], 'refs/heads/master'))
+    inputs:
+      script: |
+        COMMIT_SHA=`echo $(system.pullRequest.sourceCommitId) | cut -c 1-10`
+
+        echo "Current commit: $COMMIT_SHA"
+
+        echo "##vso[task.setvariable variable=TAG]$COMMIT_SHA"
+
+  - task: CmdLine@2
+    displayName: SET COMMIT_SHA
+    condition: not(and(eq(variables['Build.Reason'], 'PullRequest'),eq(variables['System.PullRequest.TargetBranch'], 'refs/heads/master')))
+    inputs:
+      ${{ if contains(variables['Build.SourceBranch'], 'refs/heads/') }}:
+        script: |
+          COMMIT_SHA=`echo $(Build.SourceVersion) | cut -c 1-10`
+
+          echo "Current commit: $COMMIT_SHA"
+
+          echo "##vso[task.setvariable variable=TAG]$COMMIT_SHA"
+
+      ${{ if contains(variables['Build.SourceBranch'], 'refs/tags/') }}:
+        script: |
+          TAG=`echo $(Build.SourceBranch) | cut -c 11-`
+
+          echo "Current tag: $TAG"
+
+          echo "##vso[task.setvariable variable=TAG]$TAG"

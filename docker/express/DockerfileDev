@@ -1,0 +1,15 @@
+FROM node:20.18.0-alpine
+
+ENV APP_ROOT /home/node/app/
+
+USER node
+
+RUN mkdir $APP_ROOT
+WORKDIR $APP_ROOT
+
+COPY --chown=node:node package.json yarn.lock $APP_ROOT
+RUN yarn
+
+COPY --chown=node:node . $APP_ROOT
+
+ENTRYPOINT ["yarn", "start"]

@@ -1,0 +1,16 @@
+stages:
+  - stage: DeleteBuildAgent
+    condition: always()
+    displayName: CleanUp
+    pool:
+      name: $(agentPool)
+      demands:
+        - agentType -equals init
+    jobs:
+      - job: DeleteBuildAgent
+        displayName: Delete Build Agent
+        steps:
+          - checkout: none
+          - script: |
+              helm uninstall --namespace $(agentPool) $(agentType)-$(Build.BuildId)
+            displayName: 'Delete Build Agent'

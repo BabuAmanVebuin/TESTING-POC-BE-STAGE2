@@ -1,0 +1,134 @@
+// Initially copied from DPM-BE, commit d0e2f45544cc9890762f93cf3e8f224f15efd619
+import { RangeType } from "./enums.js"
+
+export const COMMON_CONST = {
+  OOT_SHINNAGOYA_PLANT_ID: "111N",
+  DPM_SHINNAGOYA_PLANT_CODE: "N__",
+}
+
+export const CONST_VARIABLE = {
+  PLANT_ID: "Plant Id",
+  UNIT_ID: "Unit Id",
+  BLANK_ARRAY: [],
+  MIN_YEAR: 0,
+  MAX_YEAR: 9999,
+  MAXIMUM_RETRY_DB_CONNECTION: 10,
+  BM_YEAR_CONVERSION_FACTOR: 31536000, // 31536000 is from MOT m_unit_of_meaure table.  count 1 year seconds is (365*24*60*60) = 31536000
+  BM_MAINTENANCE_PLAN_YEARS: 99,
+  C_RANK_PRIORITY: "Cランク",
+  D_RANK_PRIORITY: "Dランク",
+}
+
+export const CONST_FORECAST_CATEGORY = {
+  PLANED: 1,
+  FORCAST: 2,
+  ACTUAL: 3,
+}
+
+export const CONST_FISCAL_CATEGORY = {
+  GROSS_MARGIN: 1,
+  OPERATION: 2,
+  MAINTENANCE: 3,
+}
+
+export const STOPPAGE_TYPE = {
+  PLANNED: 1,
+  UNPLANNED: 2,
+}
+
+export const FISCAL_YEAR_DATE = {
+  FISCAL_YEAR_START_DATE_PART: "-04-01 00:00:00",
+  FISCAL_YEAR_END_DATE_PART: "-03-31 23:59:59",
+}
+
+export const DATE_CONST = {
+  ISO_8601_UTC: `yyyy-MM-dd'T'HH:mm:ss.SSS'Z'`,
+  ISO_8601_KPI003: `yyyy-MM-dd'T'HH:mm`,
+  KEY_FORMAT_KPI003: "yyyyMMdd",
+  YYYY_MM_DD_HH_MM_SS_SSS: "yyyy-MM-dd HH:mm:ss.SSS",
+  YYYY_MM_DD_HH_MM_SS: "yyyy-MM-dd HH:mm:ss",
+  YYYY_MM_DD: "yyyy-MM-dd",
+  TIME_VALIDATE_HH_MM_SS_24: /^(?:[01]\d|2[0123]):(?:[012345]\d):(?:[012345]\d)/,
+}
+
+export const SUCCESS = {
+  CODE: 200,
+  MESSAGE: (msg: string): string => `Success - ${msg}.`,
+  BODY: [],
+}
+
+export const NOT_FOUND = {
+  CODE: 404,
+  MESSAGE: (msg: string): string => `Not Found - ${msg}, was not found.`,
+}
+
+export const BAD_REQUEST = {
+  CODE: 400,
+  MESSAGE: (): string => `Bad Request.`,
+}
+
+export const HTTP_STATUS = {
+  BAD_REQUEST: 400,
+  OK: 200,
+  NOT_FOUND: 404,
+  INTERNAL_SERVER: 500,
+}
+
+export const KPI004CONSTANT = {
+  FILEDS: {
+    RANGE_TYPE_YEAR_START_TO_PRESENT: RangeType.YEAR_START_TO_PRESENT,
+    RANGE_TYPE_PRESENT_TO_YEAR_END: RangeType.PRESENT_TO_YEAR_END,
+    STOPPAGE_PLANNED_HOURS: "StoppagePlannedHours",
+    STOPPAGE_PLANNED_RECORDS: "StoppagePlannedRecords",
+    STOPPAGE_ACTUAL_OR_FORECAST_HOURS: "StoppageActualOrForcastHours",
+    STOPPAGE_ACTUAL_OR_FORECAST_RECORDS: "StoppageActualOrForecastRecords",
+    STOPPAGE_PLANNED_DECRESE_HOURS: "StoppagePlannedDecreseHours",
+    STOPPAGE_PLANNED_DECRESE_RECORDS: "StoppagePlannedDecreseRecords",
+    STOPPAGE_PLANNED_INCRESED_HOURS: "StoppagePlannedIncresedHours",
+    STOPPAGE_PLANNED_INCRESED_RECORDS: "StoppagePlannedIncresedRecords",
+    STOPPAGE_CANCELED_HOURS: "StoppageCancledHours",
+    STOPPAGE_CANCELED_RECORDS: "StoppageCancledRecords",
+    STOPPAGE_UN_PLANNED_HOURS: "StoppageUnPlannedHours",
+    STOPPAGE_UN_PLANNED_RECORDS: "StoppageUnPlannedRecords",
+    GROSS_MARGIN_PLUS_IMPACT: "GrossMarginPluseImpact",
+    GROSS_MARGIN_MINUS_IMPACT: "GrossMarginMinusImpact",
+    SELLING_PRICE_PLANNED_PLAN: "SellingPricePlannedPlan",
+    SELLING_PRICE_PLANNED_ACTUAL_OR_FORECAST: "SellingPricePlannedActualOrForecast",
+    SELLING_PRICE_UN_PLANNED_ACTUAL_OR_FORECAST: "SellingPriceUnPlannedActualOrForecast",
+    STOPPAGE_PLANNED_DECRESE_HOURS_TIMEOFOUTAGE_CALCULATION: "STOPPAGE_PLANNED_DECRESE_HOURS",
+    STOPPAGE_PLANNED_DECRESE_RECORDS_TIMEOFOUTAGE_CALCULATION: "STOPPAGE_PLANNED_DECRESE_RECORDS",
+    STOPPAGE_PLANNED_INCRESED_HOURS_TIMEOFOUTAGE_CALCULATION: "STOPPAGE_PLANNED_INCRESED_HOURS",
+    STOPPAGE_PLANNED_INCRESED_RECORDS_TIMEOFOUTAGE_CALCULATION: "STOPPAGE_PLANNED_INCRESED_RECORDS",
+    STOPPAGE_CANCLED_HOURS_TIMEOFOUTAGE_CALCULATION: "STOPPAGE_CANCLED_HOURS",
+    STOPPAGE_CANCLED_RECORDS_TIMEOFOUTAGE_CALCULATION: "STOPPAGE_CANCLED_RECORDS",
+    STOPPAGE_UNPLANNED_HOURS_TIMEOFOUTAGE_CALCULATION: "STOPPAGE_UNPLANNED_HOURS",
+    STOPPAGE_UNPLANNED_RECORDS_TIMEOFOUTAGE_CALCULATION: "STOPPAGE_UNPLANNED_RECORDS",
+  },
+}
+
+export const TABLE_NAME_CONSTANTS = {
+  T_KPI004_SUBCACHE_TODAY: "RFZ_OPE_AND_MTE.t_kpi004_subcache_today",
+  T_KPI004_SUBCACHE_PREVIOUSDAY: "RFZ_OPE_AND_MTE.t_kpi004_subcache_previousday",
+  T_KPI005_SUBCACHE_TODAY: "RFZ_OPE_AND_MTE.t_kpi005_subcache_today",
+  T_KPI005_SUBCACHE_PREVIOUSDAY: "RFZ_OPE_AND_MTE.t_kpi005_subcache_previousday",
+}
+
+export const KPI005CONSTANT = {
+  FIELDS: {
+    PLANNED_GROSS_MARGIN_AT_NAGATIVE_OPERATION: "PlannedGrossMarginAtNegativeOperation",
+    ACTUAL_OR_FORCAST_GROSS_MARGIN_AT_NAGATIVE_OPERATION: "ActualOrForecastGrossMarginAtNegativeOperation",
+    PLANNED_NAGIVATIVE_OPERATING_HOURS: "PlannedNegativeOperatingHours",
+    ACTUAL_OR_FORCAST_NAGIVATIVE_OPERATING_HOURS: "ActualOrForecastNegativeOperatingHours",
+    PLANNED_SPREAD_AT_NAGATIVE_OPERATION: "PlannedSpreadAtNegativeOperation",
+    ACTUAL_OR_FORCAST_SPREAD_AT_NAGATIVE_OPERATION: "ActualOrForecastSpreadAtNegativeOperation",
+  },
+}
+
+/**
+ * Asset level information
+ */
+export const CONST_ASSET_LEVEL = {
+  8: {
+    CODE_LENGTH: 20,
+  },
+}

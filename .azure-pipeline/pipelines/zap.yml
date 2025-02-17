@@ -1,0 +1,20 @@
+resources:
+  repositories:
+    - repository: Deployment
+      type: git
+      name: ZAP
+
+variables:
+  - group: zap
+  - group: pipeline
+
+stages:
+  - template: ../templates/stages/prepare.yml
+  - template: ../templates/stages/zap-scan.yml
+    parameters:
+      zap_clusterName: $(zap_clusterName)
+      zap_resourceGroup: $(zap_resourceGroup)
+      zap_scanUrl: $(zap_scanUrl)
+      zap_nameSpace: $(zap_nameSpace)
+
+  - template: ../templates/stages/cleanup.yml

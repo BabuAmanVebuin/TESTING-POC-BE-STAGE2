@@ -1,0 +1,14 @@
+SELECT
+  SUM(OPERATION_COST) as OPERATION_COST,
+  SUM(MAINTENANCE_COST) as MAINTENANCE_COST,
+  SUM((IFNULL(OPERATION_COST, 0) + IFNULL(MAINTENANCE_COST, 0))) AS SUM
+FROM
+  t_opex_forecast
+WHERE
+  (OPERATION_COST IS NOT NULL OR
+  MAINTENANCE_COST IS NOT NULL) AND
+  PLANT_CODE = :plantCode AND
+  %unitIdFilter% AND
+  %startFiscalYearFilter% AND
+  %endFiscalYearFilter% AND
+  fiscal_year > :currentFiscalYear

@@ -1,0 +1,26 @@
+parameters:
+  - name: stage
+    type: string
+
+  - name: wso2Branch
+    type: string
+
+stages:
+  - stage: UpdateWSO2API
+    pool:
+      name: $(agentPool)
+      demands:
+        - Agent.Name -equals $(agentType)-$(Build.BuildId)
+    jobs:
+      - job: UpdateWSO2API
+        displayName: Updating ${{ parameters.stage }} API
+        steps:
+          - bash: echo ${AZURE_DEVOPS_CLI_PAT} | az devops login
+            env:
+              AZURE_DEVOPS_CLI_PAT: $(System.AccessToken)
+            displayName: 'Login Azure DevOps Extension'
+
+          - bash: az devops configure --defaults organization=$(System.TeamFoundationCollectionUri) project=$(System.TeamProject) --use-git-aliases true
+            displayName: 'Set default Azure DevOps organization and project'
+
+          - bash: az pipelines run --name $(API_UPDATE_TRIGGER_NAME) --branch=${{ parameters.wso2Branch }}

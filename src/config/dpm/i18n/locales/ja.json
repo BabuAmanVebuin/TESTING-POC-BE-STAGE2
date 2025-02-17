@@ -1,0 +1,45 @@
+{
+  "FIELD": {
+    "PLANT_CODE": "発電所コード",
+    "PLANT_NAME": "発電所名",
+    "UNIT_CODE": "ユニットコード",
+    "UNIT_NAME": "ユニット名",
+    "FISCAL_YEAR": "会計年度",
+    "FORECAST_CATEGORY": "フォレカストカテゴリー",
+    "STARTUP_MODE": "起動モード",
+    "EPOCH_SECONDS": "エポック秒",
+    "DEFECT_ID": "Defect Id"
+  },
+  "VALUE": {
+    "PREFIX_YEN": "¥",
+    "SUFFIX_HRS": "時間",
+    "SUFFIX_OKU": "億",
+    "SUFFIX_YEN_KWH": "円/kWh",
+    "SUFFIX_MAN": "万",
+    "COLD": "コールド",
+    "COLD_1": "コールドⅠ",
+    "COLD_2": "コールドⅡ",
+    "COLD_3": "コールドⅢ",
+    "HOT": "ホット",
+    "HOT_1": "ホットⅠ",
+    "HOT_2": "ホットⅡ",
+    "VERY_HOT": "ベリーホット",
+    "WARM": "ウォーム",
+    "WARM_1": "ウォームⅠ",
+    "WARM_2": "ウォームⅡ",
+    "SUFFIX_PERCENTAGE": "%",
+    "GWH": "GWh",
+    "MWH": "MWh",
+    "SUFFIX_KJ_KWh":"KJ/KWh"
+  },
+  "ERROR": {
+    "NO_DATA_FOUND": "データなし",
+    "INVALID": "アプリケーションエラー: {{fieldName}} \"{{value}}\" が不正",
+    "INVALID_FOR": "アプリケーションエラー: {{fieldName}} \"{{value}}\" が不正",
+    "INTERNAL_SERVER": "サーバーエラー",
+    "USER_ID_NOT_FOUND": "認証エラー"
+  },
+  "MESSAGE": {
+    "SUCCESS": "成功"
+  }
+}

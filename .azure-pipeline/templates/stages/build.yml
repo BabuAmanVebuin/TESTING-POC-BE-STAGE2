@@ -1,0 +1,41 @@
+parameters:
+  - name: stage
+    type: string
+
+stages:
+  - stage: Build
+    pool:
+      name: $(agentPool)
+      demands:
+        - Agent.Name -equals $(agentType)-$(Build.BuildId)
+    jobs:
+      - job: Build
+        displayName: Building ${{ parameters.stage }}
+        steps:
+          - checkout: self
+            submodules: false
+
+          - template: ../steps/set-tag.yml
+
+          # Disabled
+          #- template: ../steps/sonarqube-scan.yml
+          #  parameters:
+          #      stage: Dev
+          #      password: $(password)
+          #      resultScanUrl: $(resultScanUrl)
+          #      projectKey: $(projectKey)
+          #      projectName: $(projectName)
+          #      token: $(token)
+          #      aksName: $(aksName)
+          #      azureResourceGroup: $(azureResourceGroup)
+          #      username: $(username)
+
+          - task: AzureCLI@2
+            displayName: Build and push an image to ACR registry
+            condition: and(succeeded(), not(and(eq(variables['Build.Reason'], 'PullRequest'),eq(variables['System.PullRequest.TargetBranch'], 'refs/heads/master'))))
+            inputs:
+              azureSubscription: $(azureSubscription)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az acr build --image $(imageRepository):$(TAG) --registry $(acrRegistryName) --file $(dockerfilePath) .

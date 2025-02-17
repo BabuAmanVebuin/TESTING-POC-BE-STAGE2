@@ -1,0 +1,109 @@
+resources:
+  repositories:
+    - repository: DeploymentRepo
+      type: github
+      endpoint: jeraoss
+      name: jeraoss/$(deploymentRepo)
+      ref: main
+
+variables:
+  - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
+    - name: isDev
+      value: true
+    - name: env
+      value: dev
+  - ${{ elseif and(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), contains(variables['Build.SourceBranch'], '-rc')) }}:
+    - name: isStaging
+      value: true
+    - name: env
+      value: stg
+  - ${{ elseif and(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), contains(variables['Build.SourceBranch'], '-training')) }}:
+    - name: isTraining
+      value: true
+    - name: env
+      value: trn
+  - ${{ elseif and(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), not(contains(variables['Build.SourceBranch'], '-rc'))) }}:
+    - name: isProduction
+      value: true
+    - name: env
+      value: prd
+  - group: pipeline
+  - group: ${{ variables.env }}-envs
+  - group: ${{ variables.env }}-terraform
+  - group: azure-mysql-ssl
+
+stages:
+  - template: ../templates/stages/prepare.yml
+  - template: ../templates/stages/build.yml
+    parameters:
+      ${{ if variables.isDev }}:
+        stage: Dev
+      ${{ if variables.isStaging }}:
+        stage: Staging
+      ${{ if variables.isProduction }}:
+        stage: Production
+      ${{ if variables.isTraining }}:
+        stage: Training
+
+  - template: ../templates/stages/deploy.yml
+    parameters:
+      ${{ if variables.isDev }}:
+        stage: Dev
+        deployment: Development
+        environment: Development
+        kustomizeFolder: dev
+        kubesealCertFile: kubeseal-dev-cert.pem
+        azureResourceGroup: AKS-Dev
+        aksName: jpdevaks
+        aksNamespace: $(aksNamespace)
+        kubernetesServiceEndpoint: "AKS-Development"
+
+      ${{ if variables.isStaging }}:
+        stage: Staging
+        deployment: Staging
+        environment: Staging
+        kustomizeFolder: staging
+        kubesealCertFile: kubeseal-stg-cert.pem
+        azureResourceGroup: AKS-Stg
+        aksName: jpstgaks
+        aksNamespace: $(aksNamespace)
+        kubernetesServiceEndpoint: "AKS-Staging"
+
+      ${{ if variables.isTraining }}:
+        stage: Training
+        deployment: Training
+        environment: Production
+        kustomizeFolder: training
+        azureResourceGroup: AKS-Prod
+        aksName: jpprodaks
+        aksNamespace: $(aksNamespace)
+        kubernetesServiceEndpoint: "AKS-Production"
+        kubesealCertFile: kubeseal-prd-cert.pem
+
+      ${{ if variables.isProduction }}:
+        stage: Production
+        deployment: Production
+        environment: Production
+        kustomizeFolder: prod
+        kubesealCertFile: kubeseal-prd-cert.pem
+        azureResourceGroup: AKS-Prod
+        aksName: jpprodaks
+        aksNamespace: $(aksNamespace)
+        kubernetesServiceEndpoint: "AKS-Production"
+
+  - template: ../templates/stages/update-wso2-api.yml
+    parameters:
+      ${{ if variables.isDev }}:
+        stage: Dev
+        wso2Branch: dev
+      ${{ if variables.isStaging }}:
+        stage: Staging
+        wso2Branch: staging
+      ${{ if variables.isTraining }}:
+        stage: Training
+        wso2Branch: training
+      ${{ if variables.isProduction }}:
+        stage: Production
+        wso2Branch: master
+
+  - template: ../templates/stages/cleanup.yml

@@ -1,0 +1,146 @@
+parameters:
+  - name: stage
+    type: string
+
+  - name: deployment
+    type: string
+
+  - name: environment
+    type: string
+
+  - name: kustomizeFolder
+    type: string
+
+  - name: kustomizeEnvsFolder
+    type: string
+    default: base
+
+  - name: kubesealCertFile
+    type: string
+
+  - name: azureResourceGroup
+    type: string
+
+  - name: aksName
+    type: string
+
+  - name: aksNamespace
+    type: string
+
+  - name: kubernetesServiceEndpoint
+    type: string
+
+  - name: deployFileName
+    type: string
+    default: deploy.yml
+
+stages:
+  - stage: Deploy
+    displayName: Deploy
+    pool:
+      name: $(agentPool)
+      demands:
+        - Agent.Name -equals $(agentType)-$(Build.BuildId)
+    jobs:
+      - deployment: ${{ parameters.deployment }}
+        displayName: Deploying ${{ parameters.stage }}
+        environment: ${{ parameters.environment }}
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: DeploymentRepo
+                  submodules: true
+                  clean: true
+                  persistCredentials: true
+                - bash: echo ${AZURE_DEVOPS_CLI_PAT} | az devops login
+                  displayName: 'Login Azure DevOps Extension'
+                  env:
+                    AZURE_DEVOPS_CLI_PAT: $(System.AccessToken)
+
+                - bash: az devops configure --defaults organization=$(System.TeamFoundationCollectionUri) project=$(System.TeamProject) --use-git-aliases true
+                  displayName: 'Set default Azure DevOps organization and project'
+
+                - task: CmdLine@2
+                  displayName: Cleanup old config
+                  inputs:
+                    workingDirectory: '$(System.DefaultWorkingDirectory)/${{ parameters.kustomizeFolder }}/envs'
+                    script: |
+                      rm -f -- config.env
+
+                - template: ../steps/set-tag.yml # sets a global $(TAG) variable
+                - template: ../steps/generate-config-secret-env.yml
+                  parameters:
+                    variableGroup: "$(env)-envs"
+                    configWorkingDirectory: $(System.DefaultWorkingDirectory)/${{ parameters.kustomizeFolder }}/envs
+                    secretWorkingDirectory: $(System.DefaultWorkingDirectory)/${{ parameters.kustomizeEnvsFolder }}
+                    secretNames:
+                      - SNOWFLAKE_PASSWORD
+
+                - template: ../steps/generate-config-secret-env.yml
+                  parameters:
+                    variableGroup: "$(env)-terraform"
+                    configWorkingDirectory: $(System.DefaultWorkingDirectory)/${{ parameters.kustomizeFolder }}/envs
+                    secretWorkingDirectory: $(System.DefaultWorkingDirectory)/${{ parameters.kustomizeEnvsFolder }}
+                    secretNames:
+                      - DB_PWD
+                      - PUBLIC_SA_CONNECTION_STRING
+                      - PUBLIC_SA_ACCESS_KEY
+                      - CMN_DB_PWD
+                      - EVH_SA_CONNECTION_STRING
+                      - NTF_PUSH_NOTIFICATION_CONNECTION_STRING
+                      - EVH_MAINTENANCE_DEFECT_CONNECTION_STRING
+                      - EVH_MAINTENANCE_PLAN_CONNECTION_STRING
+                      - EVH_MAINTENANCE_ORDER_CONNECTION_STRING
+
+                - task: DownloadSecureFile@1
+                  name: kubesealCert
+                  displayName: 'Download Kubeseal Cert'
+                  inputs:
+                    secureFile: ${{ parameters.kubesealCertFile }}
+
+                - task: CmdLine@2
+                  displayName: Generate Sealed-Secrets and move config.env
+                  env:
+                    BASE_DIR: $(System.DefaultWorkingDirectory)/${{ parameters.kustomizeFolder }}
+                  inputs:
+                    workingDirectory: $(System.DefaultWorkingDirectory)/${{ parameters.kustomizeEnvsFolder }}
+                    script: |
+                      ls -la .
+                      kustomize build secrets | kubeseal --cert=$(kubesealCert.secureFilePath) --scope=cluster-wide --format=yaml > $BASE_DIR/envs/sealed-env-secret.yaml
+
+                - task: CmdLine@2
+                  displayName: Generate azure-db-ssl.pem file
+                  inputs:
+                    workingDirectory: $(System.DefaultWorkingDirectory)/base
+                    script: |
+                      echo $(AZURE-MYSQL-SSL) | base64 -d > azure-mysql-ssl.pem
+                      cat azure-mysql-ssl.pem
+
+                - task: CmdLine@2
+                  displayName: Set new image tag
+                  inputs:
+                    workingDirectory: '$(System.DefaultWorkingDirectory)/${{ parameters.kustomizeFolder }}'
+                    script: |
+                      ls -la .
+                      kustomize edit set image "$(containerRegistry)/$(imageRepository):$(TAG)"
+
+                - task: CmdLine@2
+                  displayName: Push new version to GitHub
+                  env:
+                    BASE_DIR: $(System.DefaultWorkingDirectory)/${{ parameters.kustomizeFolder }}
+                  inputs:
+                    workingDirectory: '$(System.DefaultWorkingDirectory)'
+                    script: |
+                      git switch main
+                      git config --global user.email $(gitEmail)
+                      git config --global user.name $(gitUsername)
+                      git config --list
+                      git status
+                      git add base/azure-mysql-ssl.pem
+                      git add ${{ parameters.kustomizeFolder }}/kustomization.yaml
+                      git add $BASE_DIR/envs/config.env
+                      git add $BASE_DIR/envs/sealed-env-secret.yaml
+                      git status
+                      git commit -m "pushing to ${{ parameters.stage }} $(imageRepository):$(TAG)"
+                      git push origin main

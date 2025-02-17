@@ -1,0 +1,20 @@
+
+stages:
+  - stage: Prepare
+    pool:
+      name: $(agentPool)
+      demands:
+        - agentType -equals init
+    jobs:
+      - job: CreateBuildAgent
+        displayName: Create Build Agent
+        steps:
+          - checkout: none
+          - script: |
+              helm install \
+                --namespace $(agentPool) \
+                --wait $(agentType)-$(Build.BuildId) \
+                --set agent.type=$(agentType) \
+                --set agent.repository=$(containerRegistry)/azp-agent/build \
+                /charts/azp-build-agent
+            displayName: Creating Build Agent

@@ -1,0 +1,22 @@
+version: '3'
+services:
+  mysql:
+    image: mysql:8
+    env_file:
+      - mysql.dev.env
+    ports:
+      - 3306:3306
+  express:
+    build:
+      context: ..
+      dockerfile: docker/express/DockerfileDev
+    depends_on:
+      - mysql
+    env_file:
+      - express.dev.env
+    entrypoint: yarn start:dev
+    ports:
+      - 3000:3000
+    volumes:
+      - ..:/home/node/app
+      - /home/node/app/node_modules
