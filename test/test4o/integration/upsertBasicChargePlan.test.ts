@@ -1,15 +1,16 @@
-```typescript
 import { expect } from 'chai';
 import request from 'supertest';
-import { sequelize } from '../../../src/infrastructure/orm/sqlize/index';
+import { sequelize } from '../../../src/infrastructure/orm/sqlize';
 import { BasicChargeRoutes } from '../../../src/infrastructure/webserver/express/routes';
 import Express from 'express';
+import { Transaction } from 'sequelize';
 
 const app = Express();
+app.use(Express.json());
 BasicChargeRoutes(app);
 
-describe('Basic Charge API Integration Tests', () => {
-  let transaction;
+describe('PUT /basic-charge/plan', () => {
+  let transaction: Transaction;
 
   beforeEach(async () => {
     transaction = await sequelize.transaction();
@@ -19,244 +20,364 @@ describe('Basic Charge API Integration Tests', () => {
     await transaction.rollback();
   });
 
-  describe('GET /basic-charge/plan', () => {
-    it('should return 200 and an empty array when no data is present', async () => {
-      const res = await request(app)
-        .get('/basic-charge/plan')
-        .set('Accept', 'application/json')
-        .expect(200);
+  it('should successfully upsert a basic charge plan with valid data', async () => {
+    const payload = [
+      {
+        "plant-id": "PLANT1",
+        "unit-id": "UNIT1",
+        "fiscal-year": 2023,
+        "operation-input": 100,
+        "maintenance-input": 50,
+        "user-id": "USER1"
+      }
+    ];
 
-      expect(res.body).to.be.an('array').that.is.empty;
-    });
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .expect(200);
 
-    it('should return 200 and the correct data when data is present', async () => {
-      await sequelize.query(
-        `INSERT INTO t_basic_charge_plan (PLANT_CODE, UNIT_CODE, FISCAL_YEAR, OPERATION_INPUT, MAINTENANCE_INPUT, CREATED_DATETIME, UPDATED_DATETIME, CREATE_BY, UPDATE_BY)
-         VALUES ('plant1', 'unit1', 2023, 100, 200, NOW(), NOW(), 'user1', 'user1')`,
-        { transaction }
-      );
-
-      const res = await request(app)
-        .get('/basic-charge/plan')
-        .set('Accept', 'application/json')
-        .expect(200);
-
-      expect(res.body).to.be.an('array').that.has.lengthOf(1);
-      expect(res.body[0]).to.include({
-        PLANT_CODE: 'plant1',
-        UNIT_CODE: 'unit1',
-        FISCAL_YEAR: 2023,
-        OPERATION_INPUT: 100,
-        MAINTENANCE_INPUT: 200,
-      });
-    });
+    expect(response.body).to.deep.equal({ code: 200, body: "OK" });
   });
 
-  describe('PUT /basic-charge/plan', () => {
-    it('should return 200 and upsert data successfully', async () => {
-      const payload = [
-        {
-          "plant-id": "plant1",
-          "unit-id": "unit1",
-          "fiscal-year": 2023,
-          "operation-input": 150,
-          "maintenance-input": 250,
-          "user-id": "user1"
-        }
-      ];
+  it('should handle empty payload gracefully', async () => {
+    const payload = [];
 
-      const res = await request(app)
-        .put('/basic-charge/plan')
-        .send(payload)
-        .set('Accept', 'application/json')
-        .expect(200);
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .expect(200);
 
-      expect(res.body).to.equal('OK');
-
-      const [result] = await sequelize.query(
-        `SELECT * FROM t_basic_charge_plan WHERE PLANT_CODE = 'plant1' AND UNIT_CODE = 'unit1' AND FISCAL_YEAR = 2023`,
-        { transaction }
-      );
-
-      expect(result).to.have.lengthOf(1);
-      expect(result[0]).to.include({
-        PLANT_CODE: 'plant1',
-        UNIT_CODE: 'unit1',
-        FISCAL_YEAR: 2023,
-        OPERATION_INPUT: 150,
-        MAINTENANCE_INPUT: 250,
-      });
-    });
-
-    it('should return 400 for invalid payload', async () => {
-      const payload = [
-        {
-          "plant-id": "plant1",
-          "unit-id": "unit1",
-          "fiscal-year": "invalid-year",
-          "operation-input": 150,
-          "maintenance-input": 250,
-          "user-id": "user1"
-        }
-      ];
-
-      await request(app)
-        .put('/basic-charge/plan')
-        .send(payload)
-        .set('Accept', 'application/json')
-        .expect(400);
-    });
+    expect(response.body).to.deep.equal({ code: 200, body: "OK" });
   });
 
-  describe('GET /basic-charge/forecast', () => {
-    it('should return 200 and an empty array when no forecast data is present', async () => {
-      const res = await request(app)
-        .get('/basic-charge/forecast')
-        .set('Accept', 'application/json')
-        .expect(200);
+  it('should return error for missing plant-id', async () => {
+    const payload = [
+      {
+        "unit-id": "UNIT1",
+        "fiscal-year": 2023,
+        "operation-input": 100,
+        "maintenance-input": 50,
+        "user-id": "USER1"
+      }
+    ];
 
-      expect(res.body).to.be.an('array').that.is.empty;
-    });
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .expect(400);
 
-    it('should return 200 and the correct forecast data when data is present', async () => {
-      await sequelize.query(
-        `INSERT INTO t_basic_charge_forecast (PLANT_CODE, UNIT_CODE, FISCAL_YEAR, OPERATION_INPUT, MAINTENANCE_INPUT, CREATED_DATETIME, UPDATED_DATETIME, CREATE_BY, UPDATE_BY)
-         VALUES ('plant1', 'unit1', 2023, 100, 200, NOW(), NOW(), 'user1', 'user1')`,
-        { transaction }
-      );
-
-      const res = await request(app)
-        .get('/basic-charge/forecast')
-        .set('Accept', 'application/json')
-        .expect(200);
-
-      expect(res.body).to.be.an('array').that.has.lengthOf(1);
-      expect(res.body[0]).to.include({
-        PLANT_CODE: 'plant1',
-        UNIT_CODE: 'unit1',
-        FISCAL_YEAR: 2023,
-        OPERATION_INPUT: 100,
-        MAINTENANCE_INPUT: 200,
-      });
-    });
+    expect(response.body).to.have.property('error');
   });
 
-  describe('PUT /basic-charge/forecast', () => {
-    it('should return 200 and upsert forecast data successfully', async () => {
-      const payload = [
-        {
-          "plant-id": "plant1",
-          "unit-id": "unit1",
-          "fiscal-year": 2023,
-          "operation-input": 150,
-          "maintenance-input": 250,
-          "user-id": "user1"
-        }
-      ];
+  it('should return error for missing unit-id', async () => {
+    const payload = [
+      {
+        "plant-id": "PLANT1",
+        "fiscal-year": 2023,
+        "operation-input": 100,
+        "maintenance-input": 50,
+        "user-id": "USER1"
+      }
+    ];
 
-      const res = await request(app)
-        .put('/basic-charge/forecast')
-        .send(payload)
-        .set('Accept', 'application/json')
-        .expect(200);
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .expect(400);
 
-      expect(res.body).to.equal('OK');
-
-      const [result] = await sequelize.query(
-        `SELECT * FROM t_basic_charge_forecast WHERE PLANT_CODE = 'plant1' AND UNIT_CODE = 'unit1' AND FISCAL_YEAR = 2023`,
-        { transaction }
-      );
-
-      expect(result).to.have.lengthOf(1);
-      expect(result[0]).to.include({
-        PLANT_CODE: 'plant1',
-        UNIT_CODE: 'unit1',
-        FISCAL_YEAR: 2023,
-        OPERATION_INPUT: 150,
-        MAINTENANCE_INPUT: 250,
-      });
-    });
-
-    it('should return 400 for invalid forecast payload', async () => {
-      const payload = [
-        {
-          "plant-id": "plant1",
-          "unit-id": "unit1",
-          "fiscal-year": "invalid-year",
-          "operation-input": 150,
-          "maintenance-input": 250,
-          "user-id": "user1"
-        }
-      ];
-
-      await request(app)
-        .put('/basic-charge/forecast')
-        .send(payload)
-        .set('Accept', 'application/json')
-        .expect(400);
-    });
+    expect(response.body).to.have.property('error');
   });
 
-  describe('GET /basic-charge/plan/summary', () => {
-    it('should return 200 and an empty array when no plan summary data is present', async () => {
-      const res = await request(app)
-        .get('/basic-charge/plan/summary')
-        .set('Accept', 'application/json')
-        .expect(200);
+  it('should return error for missing fiscal-year', async () => {
+    const payload = [
+      {
+        "plant-id": "PLANT1",
+        "unit-id": "UNIT1",
+        "operation-input": 100,
+        "maintenance-input": 50,
+        "user-id": "USER1"
+      }
+    ];
 
-      expect(res.body).to.be.an('array').that.is.empty;
-    });
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .expect(400);
 
-    it('should return 200 and the correct plan summary data when data is present', async () => {
-      await sequelize.query(
-        `INSERT INTO t_basic_charge_plan (PLANT_CODE, FISCAL_YEAR, OPERATION_INPUT, MAINTENANCE_INPUT, CREATED_DATETIME, UPDATED_DATETIME, CREATE_BY, UPDATE_BY)
-         VALUES ('plant1', 2023, 100, 200, NOW(), NOW(), 'user1', 'user1')`,
-        { transaction }
-      );
-
-      const res = await request(app)
-        .get('/basic-charge/plan/summary')
-        .set('Accept', 'application/json')
-        .expect(200);
-
-      expect(res.body).to.be.an('array').that.has.lengthOf(1);
-      expect(res.body[0]).to.include({
-        PLANT_CODE: 'plant1',
-        FISCAL_YEAR: 2023,
-        VALUE: 300,
-      });
-    });
+    expect(response.body).to.have.property('error');
   });
 
-  describe('GET /basic-charge/forecast/summary', () => {
-    it('should return 200 and an empty array when no forecast summary data is present', async () => {
-      const res = await request(app)
-        .get('/basic-charge/forecast/summary')
-        .set('Accept', 'application/json')
-        .expect(200);
+  it('should return error for missing operation-input', async () => {
+    const payload = [
+      {
+        "plant-id": "PLANT1",
+        "unit-id": "UNIT1",
+        "fiscal-year": 2023,
+        "maintenance-input": 50,
+        "user-id": "USER1"
+      }
+    ];
 
-      expect(res.body).to.be.an('array').that.is.empty;
-    });
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .expect(400);
 
-    it('should return 200 and the correct forecast summary data when data is present', async () => {
-      await sequelize.query(
-        `INSERT INTO t_basic_charge_forecast (PLANT_CODE, FISCAL_YEAR, OPERATION_INPUT, MAINTENANCE_INPUT, CREATED_DATETIME, UPDATED_DATETIME, CREATE_BY, UPDATE_BY)
-         VALUES ('plant1', 2023, 100, 200, NOW(), NOW(), 'user1', 'user1')`,
-        { transaction }
-      );
+    expect(response.body).to.have.property('error');
+  });
 
-      const res = await request(app)
-        .get('/basic-charge/forecast/summary')
-        .set('Accept', 'application/json')
-        .expect(200);
+  it('should return error for missing maintenance-input', async () => {
+    const payload = [
+      {
+        "plant-id": "PLANT1",
+        "unit-id": "UNIT1",
+        "fiscal-year": 2023,
+        "operation-input": 100,
+        "user-id": "USER1"
+      }
+    ];
 
-      expect(res.body).to.be.an('array').that.has.lengthOf(1);
-      expect(res.body[0]).to.include({
-        PLANT_CODE: 'plant1',
-        FISCAL_YEAR: 2023,
-        VALUE: 300,
-      });
-    });
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .expect(400);
+
+    expect(response.body).to.have.property('error');
+  });
+
+  it('should return error for missing user-id', async () => {
+    const payload = [
+      {
+        "plant-id": "PLANT1",
+        "unit-id": "UNIT1",
+        "fiscal-year": 2023,
+        "operation-input": 100,
+        "maintenance-input": 50
+      }
+    ];
+
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .expect(400);
+
+    expect(response.body).to.have.property('error');
+  });
+
+  it('should handle null operation-input', async () => {
+    const payload = [
+      {
+        "plant-id": "PLANT1",
+        "unit-id": "UNIT1",
+        "fiscal-year": 2023,
+        "operation-input": null,
+        "maintenance-input": 50,
+        "user-id": "USER1"
+      }
+    ];
+
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .expect(200);
+
+    expect(response.body).to.deep.equal({ code: 200, body: "OK" });
+  });
+
+  it('should handle null maintenance-input', async () => {
+    const payload = [
+      {
+        "plant-id": "PLANT1",
+        "unit-id": "UNIT1",
+        "fiscal-year": 2023,
+        "operation-input": 100,
+        "maintenance-input": null,
+        "user-id": "USER1"
+      }
+    ];
+
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .expect(200);
+
+    expect(response.body).to.deep.equal({ code: 200, body: "OK" });
+  });
+
+  it('should handle multiple entries in payload', async () => {
+    const payload = [
+      {
+        "plant-id": "PLANT1",
+        "unit-id": "UNIT1",
+        "fiscal-year": 2023,
+        "operation-input": 100,
+        "maintenance-input": 50,
+        "user-id": "USER1"
+      },
+      {
+        "plant-id": "PLANT2",
+        "unit-id": "UNIT2",
+        "fiscal-year": 2024,
+        "operation-input": 200,
+        "maintenance-input": 100,
+        "user-id": "USER2"
+      }
+    ];
+
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .expect(200);
+
+    expect(response.body).to.deep.equal({ code: 200, body: "OK" });
+  });
+
+  it('should return error for invalid fiscal-year type', async () => {
+    const payload = [
+      {
+        "plant-id": "PLANT1",
+        "unit-id": "UNIT1",
+        "fiscal-year": "invalid",
+        "operation-input": 100,
+        "maintenance-input": 50,
+        "user-id": "USER1"
+      }
+    ];
+
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .expect(400);
+
+    expect(response.body).to.have.property('error');
+  });
+
+  it('should return error for invalid operation-input type', async () => {
+    const payload = [
+      {
+        "plant-id": "PLANT1",
+        "unit-id": "UNIT1",
+        "fiscal-year": 2023,
+        "operation-input": "invalid",
+        "maintenance-input": 50,
+        "user-id": "USER1"
+      }
+    ];
+
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .expect(400);
+
+    expect(response.body).to.have.property('error');
+  });
+
+  it('should return error for invalid maintenance-input type', async () => {
+    const payload = [
+      {
+        "plant-id": "PLANT1",
+        "unit-id": "UNIT1",
+        "fiscal-year": 2023,
+        "operation-input": 100,
+        "maintenance-input": "invalid",
+        "user-id": "USER1"
+      }
+    ];
+
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .expect(400);
+
+    expect(response.body).to.have.property('error');
+  });
+
+  it('should return error for invalid user-id type', async () => {
+    const payload = [
+      {
+        "plant-id": "PLANT1",
+        "unit-id": "UNIT1",
+        "fiscal-year": 2023,
+        "operation-input": 100,
+        "maintenance-input": 50,
+        "user-id": 123
+      }
+    ];
+
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .expect(400);
+
+    expect(response.body).to.have.property('error');
+  });
+
+  it('should handle large payloads efficiently', async () => {
+    const payload = Array.from({ length: 1000 }, (_, i) => ({
+      "plant-id": `PLANT${i}`,
+      "unit-id": `UNIT${i}`,
+      "fiscal-year": 2023,
+      "operation-input": 100,
+      "maintenance-input": 50,
+      "user-id": `USER${i}`
+    }));
+
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .expect(200);
+
+    expect(response.body).to.deep.equal({ code: 200, body: "OK" });
+  });
+
+  it('should return error for payload exceeding size limit', async () => {
+    const payload = Array.from({ length: 10001 }, (_, i) => ({
+      "plant-id": `PLANT${i}`,
+      "unit-id": `UNIT${i}`,
+      "fiscal-year": 2023,
+      "operation-input": 100,
+      "maintenance-input": 50,
+      "user-id": `USER${i}`
+    }));
+
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .expect(413);
+
+    expect(response.body).to.have.property('error');
+  });
+
+  it('should return error for invalid JSON format', async () => {
+    const payload = '{"plant-id": "PLANT1", "unit-id": "UNIT1", "fiscal-year": 2023, "operation-input": 100, "maintenance-input": 50, "user-id": "USER1"';
+
+    const response = await request(app)
+      .put('/basic-charge/plan')
+      .set('Content-Type', 'application/json')
+      .send(payload)
+      .expect(400);
+
+    expect(response.body).to.have.property('error');
+  });
+
+  it('should return error for unsupported HTTP method', async () => {
+    const payload = [
+      {
+        "plant-id": "PLANT1",
+        "unit-id": "UNIT1",
+        "fiscal-year": 2023,
+        "operation-input": 100,
+        "maintenance-input": 50,
+        "user-id": "USER1"
+      }
+    ];
+
+    const response = await request(app)
+      .post('/basic-charge/plan')
+      .send(payload)
+      .expect(405);
+
+    expect(response.body).to.have.property('error');
   });
 });
-```
