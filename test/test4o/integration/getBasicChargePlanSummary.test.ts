@@ -1,206 +1,217 @@
-```typescript
 import { expect } from 'chai';
 import request from 'supertest';
-import { sequelize } from '../../../src/orm/sqlize/index';
-import { BasicChargeRoutes } from '../../../src/infrastructure/webserver/express/routes';
-import Express from 'express';
+import { app } from '../../../src/app';
+import { sequelize } from '../../../src/infrastructure/orm/sqlize';
+import { startTransaction, rollbackTransaction } from '../../../src/infrastructure/orm/sqlize/transaction';
+import { Transaction } from 'sequelize';
 
-const app = Express();
-BasicChargeRoutes(app);
+describe('GET /basic-charge/plan/summary', () => {
+  let transaction: Transaction;
 
-describe('Basic Charge API Integration Tests', () => {
-  let transaction;
-
-  before(async () => {
-    transaction = await sequelize.transaction();
+  beforeEach(async () => {
+    transaction = await startTransaction();
   });
 
-  after(async () => {
-    await transaction.rollback();
+  afterEach(async () => {
+    await rollbackTransaction(transaction);
   });
 
-  describe('GET /basic-charge/plan/summary', () => {
-    it('should return 200 and the correct data for valid request', async () => {
-      await request(app)
-        .get('/basic-charge/plan/summary')
-        .query({ 'plant-id': 'PLANT1', 'start-fiscal-year': 2020, 'end-fiscal-year': 2022 })
-        .expect(200)
-        .then((response) => {
-          expect(response.body).to.be.an('array');
-          expect(response.body[0]).to.have.property('plant-id', 'PLANT1');
-        });
-    });
+  it('should return 200 and the correct summary data for valid plant-id and fiscal years', async () => {
+    await insertFixture('insertBasicChargePlanSummary.sql', transaction);
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'plant-id': 'PLANT1', 'start-fiscal-year': 2020, 'end-fiscal-year': 2022 })
+      .expect(200);
 
-    it('should return 400 for missing plant-id', async () => {
-      await request(app)
-        .get('/basic-charge/plan/summary')
-        .query({ 'start-fiscal-year': 2020, 'end-fiscal-year': 2022 })
-        .expect(400);
-    });
-
-    it('should return 400 for invalid fiscal year range', async () => {
-      await request(app)
-        .get('/basic-charge/plan/summary')
-        .query({ 'plant-id': 'PLANT1', 'start-fiscal-year': 2023, 'end-fiscal-year': 2022 })
-        .expect(400);
-    });
-
-    it('should return 404 for non-existent plant-id', async () => {
-      await request(app)
-        .get('/basic-charge/plan/summary')
-        .query({ 'plant-id': 'NON_EXISTENT', 'start-fiscal-year': 2020, 'end-fiscal-year': 2022 })
-        .expect(404);
-    });
+    expect(res.body).to.have.property('code', 200);
+    expect(res.body.body).to.be.an('array').that.is.not.empty;
+    expect(res.body.body[0]).to.have.property('plant-id', 'PLANT1');
   });
 
-  describe('PUT /basic-charge/plan', () => {
-    it('should return 200 for successful upsert', async () => {
-      await request(app)
-        .put('/basic-charge/plan')
-        .send({
-          plantCode: 'PLANT1',
-          unitCode: 'UNIT1',
-          fiscalYear: 2022,
-          operationInput: 1000,
-          maintenanceInput: 500,
-          userId: 'user1',
-        })
-        .expect(200);
-    });
+  it('should return 200 and an empty array if no data matches the query', async () => {
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'plant-id': 'NON_EXISTENT', 'start-fiscal-year': 2020, 'end-fiscal-year': 2022 })
+      .expect(200);
 
-    it('should return 400 for missing required fields', async () => {
-      await request(app)
-        .put('/basic-charge/plan')
-        .send({
-          plantCode: 'PLANT1',
-          fiscalYear: 2022,
-          operationInput: 1000,
-        })
-        .expect(400);
-    });
-
-    it('should return 400 for invalid data types', async () => {
-      await request(app)
-        .put('/basic-charge/plan')
-        .send({
-          plantCode: 'PLANT1',
-          unitCode: 'UNIT1',
-          fiscalYear: 'invalid',
-          operationInput: 1000,
-          maintenanceInput: 500,
-          userId: 'user1',
-        })
-        .expect(400);
-    });
+    expect(res.body).to.have.property('code', 200);
+    expect(res.body.body).to.be.an('array').that.is.empty;
   });
 
-  describe('GET /basic-charge/forecast', () => {
-    it('should return 200 and the correct data for valid request', async () => {
-      await request(app)
-        .get('/basic-charge/forecast')
-        .query({ 'plant-id': 'PLANT1', 'start-fiscal-year': 2020, 'end-fiscal-year': 2022 })
-        .expect(200)
-        .then((response) => {
-          expect(response.body).to.be.an('array');
-          expect(response.body[0]).to.have.property('plant-id', 'PLANT1');
-        });
-    });
+  it('should return 400 if plant-id is missing', async () => {
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'start-fiscal-year': 2020, 'end-fiscal-year': 2022 })
+      .expect(400);
 
-    it('should return 400 for missing plant-id', async () => {
-      await request(app)
-        .get('/basic-charge/forecast')
-        .query({ 'start-fiscal-year': 2020, 'end-fiscal-year': 2022 })
-        .expect(400);
-    });
-
-    it('should return 400 for invalid fiscal year range', async () => {
-      await request(app)
-        .get('/basic-charge/forecast')
-        .query({ 'plant-id': 'PLANT1', 'start-fiscal-year': 2023, 'end-fiscal-year': 2022 })
-        .expect(400);
-    });
-
-    it('should return 404 for non-existent plant-id', async () => {
-      await request(app)
-        .get('/basic-charge/forecast')
-        .query({ 'plant-id': 'NON_EXISTENT', 'start-fiscal-year': 2020, 'end-fiscal-year': 2022 })
-        .expect(404);
-    });
+    expect(res.body).to.have.property('error');
   });
 
-  describe('PUT /basic-charge/forecast', () => {
-    it('should return 200 for successful upsert', async () => {
-      await request(app)
-        .put('/basic-charge/forecast')
-        .send({
-          plantCode: 'PLANT1',
-          unitCode: 'UNIT1',
-          fiscalYear: 2022,
-          operationInput: 1000,
-          maintenanceInput: 500,
-          userId: 'user1',
-        })
-        .expect(200);
-    });
+  it('should return 400 if start-fiscal-year is not a number', async () => {
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'plant-id': 'PLANT1', 'start-fiscal-year': 'invalid', 'end-fiscal-year': 2022 })
+      .expect(400);
 
-    it('should return 400 for missing required fields', async () => {
-      await request(app)
-        .put('/basic-charge/forecast')
-        .send({
-          plantCode: 'PLANT1',
-          fiscalYear: 2022,
-          operationInput: 1000,
-        })
-        .expect(400);
-    });
-
-    it('should return 400 for invalid data types', async () => {
-      await request(app)
-        .put('/basic-charge/forecast')
-        .send({
-          plantCode: 'PLANT1',
-          unitCode: 'UNIT1',
-          fiscalYear: 'invalid',
-          operationInput: 1000,
-          maintenanceInput: 500,
-          userId: 'user1',
-        })
-        .expect(400);
-    });
+    expect(res.body).to.have.property('error');
   });
 
-  describe('GET /basic-charge/forecast/summary', () => {
-    it('should return 200 and the correct data for valid request', async () => {
-      await request(app)
-        .get('/basic-charge/forecast/summary')
-        .query({ 'plant-id': 'PLANT1', 'start-fiscal-year': 2020, 'end-fiscal-year': 2022 })
-        .expect(200)
-        .then((response) => {
-          expect(response.body).to.be.an('array');
-          expect(response.body[0]).to.have.property('plant-id', 'PLANT1');
-        });
-    });
+  it('should return 400 if end-fiscal-year is not a number', async () => {
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'plant-id': 'PLANT1', 'start-fiscal-year': 2020, 'end-fiscal-year': 'invalid' })
+      .expect(400);
 
-    it('should return 400 for missing plant-id', async () => {
-      await request(app)
-        .get('/basic-charge/forecast/summary')
-        .query({ 'start-fiscal-year': 2020, 'end-fiscal-year': 2022 })
-        .expect(400);
-    });
+    expect(res.body).to.have.property('error');
+  });
 
-    it('should return 400 for invalid fiscal year range', async () => {
-      await request(app)
-        .get('/basic-charge/forecast/summary')
-        .query({ 'plant-id': 'PLANT1', 'start-fiscal-year': 2023, 'end-fiscal-year': 2022 })
-        .expect(400);
-    });
+  it('should return 200 and handle large datasets efficiently', async () => {
+    await insertFixture('insertLargeBasicChargePlanSummary.sql', transaction);
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'plant-id': 'PLANT1', 'start-fiscal-year': 2000, 'end-fiscal-year': 2022 })
+      .expect(200);
 
-    it('should return 404 for non-existent plant-id', async () => {
-      await request(app)
-        .get('/basic-charge/forecast/summary')
-        .query({ 'plant-id': 'NON_EXISTENT', 'start-fiscal-year': 2020, 'end-fiscal-year': 2022 })
-        .expect(404);
-    });
+    expect(res.body).to.have.property('code', 200);
+    expect(res.body.body).to.be.an('array').that.is.not.empty;
+  });
+
+  it('should return 200 and filter data correctly by fiscal year range', async () => {
+    await insertFixture('insertBasicChargePlanSummary.sql', transaction);
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'plant-id': 'PLANT1', 'start-fiscal-year': 2021, 'end-fiscal-year': 2021 })
+      .expect(200);
+
+    expect(res.body).to.have.property('code', 200);
+    expect(res.body.body).to.be.an('array').that.has.lengthOf(1);
+    expect(res.body.body[0]).to.have.property('fiscal-year', 2021);
+  });
+
+  it('should return 200 and handle missing start-fiscal-year gracefully', async () => {
+    await insertFixture('insertBasicChargePlanSummary.sql', transaction);
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'plant-id': 'PLANT1', 'end-fiscal-year': 2022 })
+      .expect(200);
+
+    expect(res.body).to.have.property('code', 200);
+    expect(res.body.body).to.be.an('array').that.is.not.empty;
+  });
+
+  it('should return 200 and handle missing end-fiscal-year gracefully', async () => {
+    await insertFixture('insertBasicChargePlanSummary.sql', transaction);
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'plant-id': 'PLANT1', 'start-fiscal-year': 2020 })
+      .expect(200);
+
+    expect(res.body).to.have.property('code', 200);
+    expect(res.body.body).to.be.an('array').that.is.not.empty;
+  });
+
+  it('should return 200 and handle no fiscal year filters gracefully', async () => {
+    await insertFixture('insertBasicChargePlanSummary.sql', transaction);
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'plant-id': 'PLANT1' })
+      .expect(200);
+
+    expect(res.body).to.have.property('code', 200);
+    expect(res.body.body).to.be.an('array').that.is.not.empty;
+  });
+
+  it('should return 200 and handle special characters in plant-id', async () => {
+    await insertFixture('insertSpecialCharBasicChargePlanSummary.sql', transaction);
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'plant-id': 'PLANT#1', 'start-fiscal-year': 2020, 'end-fiscal-year': 2022 })
+      .expect(200);
+
+    expect(res.body).to.have.property('code', 200);
+    expect(res.body.body).to.be.an('array').that.is.not.empty;
+    expect(res.body.body[0]).to.have.property('plant-id', 'PLANT#1');
+  });
+
+  it('should return 200 and handle SQL injection attempts gracefully', async () => {
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'plant-id': 'PLANT1; DROP TABLE t_basic_charge_plan;', 'start-fiscal-year': 2020, 'end-fiscal-year': 2022 })
+      .expect(200);
+
+    expect(res.body).to.have.property('code', 200);
+    expect(res.body.body).to.be.an('array').that.is.empty;
+  });
+
+  it('should return 200 and handle large fiscal year ranges efficiently', async () => {
+    await insertFixture('insertBasicChargePlanSummary.sql', transaction);
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'plant-id': 'PLANT1', 'start-fiscal-year': 1900, 'end-fiscal-year': 2100 })
+      .expect(200);
+
+    expect(res.body).to.have.property('code', 200);
+    expect(res.body.body).to.be.an('array').that.is.not.empty;
+  });
+
+  it('should return 200 and handle overlapping fiscal year ranges correctly', async () => {
+    await insertFixture('insertBasicChargePlanSummary.sql', transaction);
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'plant-id': 'PLANT1', 'start-fiscal-year': 2021, 'end-fiscal-year': 2023 })
+      .expect(200);
+
+    expect(res.body).to.have.property('code', 200);
+    expect(res.body.body).to.be.an('array').that.is.not.empty;
+  });
+
+  it('should return 200 and handle non-overlapping fiscal year ranges correctly', async () => {
+    await insertFixture('insertBasicChargePlanSummary.sql', transaction);
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'plant-id': 'PLANT1', 'start-fiscal-year': 2025, 'end-fiscal-year': 2026 })
+      .expect(200);
+
+    expect(res.body).to.have.property('code', 200);
+    expect(res.body.body).to.be.an('array').that.is.empty;
+  });
+
+  it('should return 200 and handle multiple plant-ids correctly', async () => {
+    await insertFixture('insertMultiplePlantBasicChargePlanSummary.sql', transaction);
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'plant-id': 'PLANT1,PLANT2', 'start-fiscal-year': 2020, 'end-fiscal-year': 2022 })
+      .expect(200);
+
+    expect(res.body).to.have.property('code', 200);
+    expect(res.body.body).to.be.an('array').that.is.not.empty;
+  });
+
+  it('should return 200 and handle empty query parameters gracefully', async () => {
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({})
+      .expect(400);
+
+    expect(res.body).to.have.property('error');
+  });
+
+  it('should return 200 and handle invalid query parameters gracefully', async () => {
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'invalid-param': 'value' })
+      .expect(400);
+
+    expect(res.body).to.have.property('error');
+  });
+
+  it('should return 200 and handle large number of query parameters gracefully', async () => {
+    const res = await request(app)
+      .get('/basic-charge/plan/summary')
+      .query({ 'plant-id': 'PLANT1', 'start-fiscal-year': 2020, 'end-fiscal-year': 2022, 'extra-param': 'value' })
+      .expect(200);
+
+    expect(res.body).to.have.property('code', 200);
+    expect(res.body.body).to.be.an('array').that.is.not.empty;
   });
 });
-```

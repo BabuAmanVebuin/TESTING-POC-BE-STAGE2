@@ -45,10 +45,11 @@ const detectedControllers = getAllTsFiles(controllersDir)
 // Step 9: Define the mapping between use cases and their corresponding files (repository, port, entity, dto, route)
 function getFileMapping(): Record<
   string,
-  { repo: string[]; port: string[]; entity: string[]; dto: string; route: string }
+  { apiPath: string; repo: string[]; port: string[]; entity: string[]; dto: string; route: string }
 > {
   return {
     getBasicChargePlan: {
+      apiPath: "GET /basic-charge/plan",
       repo: ["BasicChargeRepositorySequelizeMySQL.ts"],
       port: ["BasicChargeRepositoryPort.ts"],
       entity: [],
@@ -56,6 +57,7 @@ function getFileMapping(): Record<
       route: "basicChargeRoutes.ts",
     },
     upsertBasicChargePlan: {
+      apiPath: "PUT /basic-charge/plan",
       repo: ["BasicChargeRepositorySequelizeMySQL.ts"],
       port: ["BasicChargeRepositoryPort.ts"],
       entity: [],
@@ -63,6 +65,7 @@ function getFileMapping(): Record<
       route: "basicChargeRoutes.ts",
     },
     getBasicChargePlanSummary: {
+      apiPath: "GET /basic-charge/plan/summary",
       repo: ["BasicChargeRepositorySequelizeMySQL.ts"],
       port: ["BasicChargeRepositoryPort.ts"],
       entity: [],
@@ -74,7 +77,6 @@ function getFileMapping(): Record<
 }
 
 const fileMap = getFileMapping()
-console.log('fileMap', fileMap)
 
 // Step 10: Generate the list of test files corresponding to the detected controllers
 const detectedTestFiles = detectedControllers.map((controllerPath) => {
@@ -86,13 +88,13 @@ const detectedTestFiles = detectedControllers.map((controllerPath) => {
 
   // Get file mappings for the base controller name
   const files = fileMap[baseName] || {
+    apiPath: "",
     repo: [],
     port: [],
     entity: [],
     dto: "",
     route: "",
   }
-console.log({chirag:files});
 
   // Map the repository, port, entity, dto, and route paths
   const repoPath = files.repo.map((repo) => path.join(repositoriesDir, repo))
@@ -110,6 +112,7 @@ console.log({chirag:files});
   const routeExists = routePath && fs.existsSync(routePath)
 
   console.log(`📝 Checking: ${baseName}`)
+  console.log(`  🔹 API Path: ${files.apiPath || "N/A"} → Exists? ${files.apiPath ? true : false}`)
   console.log(`  🔹 Controller: ${controllerFile}`)
   console.log(`  🔹 Use Case: ${useCaseFile} → Exists? ${useCaseExists}`)
   console.log(`  🔹 Repository: ${files.repo || "N/A"} → Exists? ${repoExists}`)
@@ -120,6 +123,7 @@ console.log({chirag:files});
 
   return {
     name: `${baseName}.test.ts`,
+    apiPath: files.apiPath,
     controller: controllerFile,
     useCase: useCaseExists ? useCaseFile : null,
     repo: repoExists ? files.repo : null,
@@ -143,6 +147,7 @@ const readFileContent = (filePath: string): string | null => {
 // Step 12: Function to generate the test cases by sending the prompt to OpenAI API
 async function generateTest(
   fileName: string,
+  apiPath: string,
   controllerFile: string,
   useCaseFile: string | null,
   repositoryFile: string[] | null,
@@ -176,7 +181,17 @@ async function generateTest(
   const integrationPrompt = `
   STRICTLY FOLLOW THE INSTRUCTIONS BELOW WITHOUT EXCEPTION:
 
-  Given the following TypeScript files:
+  Given the following TypeScript files, you MUST generate test cases for ONLY the specified **API Path**:
+
+  **API Path:**
+  \`\`\`typescript
+  ${apiPath}
+  \`\`\`
+
+  **Route:**
+  \`\`\`typescript
+  ${routeCode}
+  \`\`\`
 
   **Controller:**
   \`\`\`typescript
@@ -208,11 +223,6 @@ async function generateTest(
   ${dtoCode}
   \`\`\`
 
-  **Route:**
-  \`\`\`typescript
-  ${routeCode}
-  \`\`\`
-
   YOU MUST GENERATE a **complete and exhaustive integration API test consisting of a minimum of 20 test cases, focusing on the full API flow from beginning to end** in TypeScript.
 
   **MANDATORY REQUIREMENTS (DO NOT IGNORE ANY):**
@@ -222,7 +232,7 @@ async function generateTest(
   - The test **MUST** manage database state using **Sequelize transactions**.
   - The test **MUST** ensure **ALL POSSIBLE CASES, including both SUCCESS and FAILURE scenarios, are covered completely**.
   - **DO NOT SKIP ANY CONTENTS OR EDGE CASES**.
-  - **DO NOT wrap the output inside code blocks like \`\`\`typescript**.
+  - **DO NOT** wrap the output inside code blocks like \`\`\`typescript.
   - **The output MUST ONLY contain valid TypeScript Mocha test code—NO COMMENTS, NO EXPLANATIONS, NO EXTRA TEXT.**
   - **FAILURE TO FOLLOW THESE INSTRUCTIONS WILL BE CONSIDERED AN ERROR.**
 
@@ -249,6 +259,9 @@ async function generateTest(
      - The test **MUST** use \`insertFixture\` to preload necessary data.
      - Example:
        \`await insertFixture("insertBasicChargePlanSummary.sql", transaction);\`
+
+  5. **Ensure test output is not wrapped in code blocks:**
+     - The generated test MUST not wrap the test code inside TypeScript code blocks like \`\`\`\typescript\`\`\`. It should be plain TypeScript code without any wrapping.
 
   **Final Note:**
   - The generated test file **MUST** run successfully in a TypeScript project using Mocha, Chai, and Sequelize.
@@ -285,7 +298,17 @@ async function generateTest(
   const unitPrompt = `
    STRICTLY FOLLOW THE INSTRUCTIONS BELOW WITHOUT EXCEPTION:
 
-  Given the following TypeScript files:
+  Given the following TypeScript files, you MUST generate test cases for ONLY the specified **API Path**:
+
+   **API Path:**
+  \`\`\`typescript
+  ${apiPath}
+  \`\`\`
+
+  **Route:**
+  \`\`\`typescript
+  ${routeCode}
+  \`\`\`
 
   **Controller:**
   \`\`\`typescript
@@ -317,11 +340,6 @@ async function generateTest(
   ${dtoCode}
   \`\`\`
 
-  **Route:**
-  \`\`\`typescript
-  ${routeCode}
-  \`\`\`
-
   YOU MUST GENERATE a **complete and exhaustive unit test consisting of a minimum of 20 test cases, focusing only on the Use Case file** in TypeScript.
 
   **MANDATORY REQUIREMENTS (DO NOT IGNORE ANY):**
@@ -330,7 +348,7 @@ async function generateTest(
   - The test **MUST** ensure that **the Repository is properly mocked**.
   - The test **MUST** include both **successful and failure cases**.
   - **DO NOT SKIP ANY CONTENTS OR EDGE CASES**.
-  - **DO NOT wrap the output inside code blocks like \`\`\`typescript**.
+  - **DO NOT** wrap the output inside code blocks like \`\`\`typescript.
   - **The output MUST ONLY contain valid TypeScript Mocha test code—NO COMMENTS, NO EXPLANATIONS, NO EXTRA TEXT.**
   - **FAILURE TO FOLLOW THESE INSTRUCTIONS WILL BE CONSIDERED AN ERROR.**
 
@@ -354,6 +372,9 @@ async function generateTest(
      - The test **MUST** use \`insertFixture\` to preload necessary data.
      - Example:
        \`await insertFixture("insertBasicChargePlanSummary.sql", transaction);\`
+
+  5. **Ensure test output is not wrapped in code blocks:**
+     - The generated test MUST not wrap the test code inside TypeScript code blocks like \`\`\`\typescript\`\`\`. It should be plain TypeScript code without any wrapping.
 
   **Final Note:**
   - The generated test file **MUST** run successfully in a TypeScript project using Mocha and Chai.
@@ -390,8 +411,9 @@ async function generateTest(
 
 // Step 19: Generate All Tests
 async function generateAllTests() {
-  for (const { name, controller, useCase, repo, port, entity, dto, route } of detectedTestFiles) {
+  for (const { name, apiPath, controller, useCase, repo, port, entity, dto, route } of detectedTestFiles) {
     console.log(`Generating test for: ${name}`)
+    console.log(`  apiPath: ${apiPath}`)
     console.log(`  Controller: ${controller}`)
     console.log(`  Use Case: ${useCase}`)
     console.log(`  Repository: ${repo}`)
@@ -401,6 +423,7 @@ async function generateAllTests() {
     console.log(`  Route: ${route}`)
     await generateTest(
       name,
+      apiPath,
       controller,
       useCase || null,
       repo || null,
