@@ -45,11 +45,12 @@ const detectedControllers = getAllTsFiles(controllersDir)
 // Step 9: Define the mapping between use cases and their corresponding files (repository, port, entity, dto, route)
 function getFileMapping(): Record<
   string,
-  { apiPath: string; repo: string[]; port: string[]; entity: string[]; dto: string; route: string }
+  { apiPath: string; repoName: string; repo: string[]; port: string[]; entity: string[]; dto: string; route: string }
 > {
   return {
     getBasicChargePlan: {
       apiPath: "GET /basic-charge/plan",
+      repoName: "getBasicChargePlan",
       repo: ["BasicChargeRepositorySequelizeMySQL.ts"],
       port: ["BasicChargeRepositoryPort.ts"],
       entity: [],
@@ -58,6 +59,7 @@ function getFileMapping(): Record<
     },
     upsertBasicChargePlan: {
       apiPath: "PUT /basic-charge/plan",
+      repoName: "upsertBasicChargePlan",
       repo: ["BasicChargeRepositorySequelizeMySQL.ts"],
       port: ["BasicChargeRepositoryPort.ts"],
       entity: [],
@@ -66,6 +68,7 @@ function getFileMapping(): Record<
     },
     getBasicChargePlanSummary: {
       apiPath: "GET /basic-charge/plan/summary",
+      repoName: "getBasicChargePlanSummary",
       repo: ["BasicChargeRepositorySequelizeMySQL.ts"],
       port: ["BasicChargeRepositoryPort.ts"],
       entity: [],
@@ -89,6 +92,7 @@ const detectedTestFiles = detectedControllers.map((controllerPath) => {
   // Get file mappings for the base controller name
   const files = fileMap[baseName] || {
     apiPath: "",
+    repoName: "",
     repo: [],
     port: [],
     entity: [],
@@ -115,6 +119,7 @@ const detectedTestFiles = detectedControllers.map((controllerPath) => {
   console.log(`  🔹 API Path: ${files.apiPath || "N/A"} → Exists? ${files.apiPath ? true : false}`)
   console.log(`  🔹 Controller: ${controllerFile}`)
   console.log(`  🔹 Use Case: ${useCaseFile} → Exists? ${useCaseExists}`)
+  console.log(`  🔹 API Path: ${files.repoName || "N/A"} → Exists? ${files.repoName ? true : false}`)
   console.log(`  🔹 Repository: ${files.repo || "N/A"} → Exists? ${repoExists}`)
   console.log(`  🔹 Port: ${files.port || "N/A"} → Exists? ${portExists}`)
   console.log(`  🔹 Entity: ${files.entity || "N/A"} → Exists? ${entityExists}`)
@@ -126,6 +131,7 @@ const detectedTestFiles = detectedControllers.map((controllerPath) => {
     apiPath: files.apiPath,
     controller: controllerFile,
     useCase: useCaseExists ? useCaseFile : null,
+    repoName: files.repoName,
     repo: repoExists ? files.repo : null,
     port: portExists ? files.port : null,
     entity: entityExists ? files.entity : null,
@@ -150,6 +156,7 @@ async function generateTest(
   apiPath: string,
   controllerFile: string,
   useCaseFile: string | null,
+  repoName: string,
   repositoryFile: string[] | null,
   portFile: string[] | null,
   entityFile: string[] | null,
@@ -181,95 +188,98 @@ async function generateTest(
   const integrationPrompt = `
   STRICTLY FOLLOW THE INSTRUCTIONS BELOW WITHOUT EXCEPTION:
 
-  Given the following TypeScript files, you MUST generate test cases for ONLY the specified **API Path**:
+  Given the following TypeScript files, you MUST generate test cases for ONLY the specified API Path:
 
-  **API Path:**
+  API Path:
   \`\`\`typescript
   ${apiPath}
   \`\`\`
 
-  **Route:**
+  Route:
   \`\`\`typescript
   ${routeCode}
   \`\`\`
 
-  **Controller:**
+  Controller:
   \`\`\`typescript
   ${controllerCode}
   \`\`\`
 
-  **Use Case:**
+  Use Case:
   \`\`\`typescript
   ${useCaseCode}
   \`\`\`
 
-  **Repository:**
+  Repository: ${repoName}
   \`\`\`typescript
   ${repositoryCode}
   \`\`\`
 
-  **Port:**
+  Port:
   \`\`\`typescript
   ${portCode}
   \`\`\`
 
-  **Entity:**
+  Entity:
   \`\`\`typescript
   ${entityCode}
   \`\`\`
 
-  **DTO:**
+  DTO:
   \`\`\`typescript
   ${dtoCode}
   \`\`\`
 
-  YOU MUST GENERATE a **complete and exhaustive integration API test consisting of a minimum of 20 test cases, focusing on the full API flow from beginning to end** in TypeScript.
+  YOU MUST GENERATE a complete and exhaustive integration API test consisting of a minimum of 20 test cases, focusing on the full API flow from beginning to end in TypeScript.
 
-  **MANDATORY REQUIREMENTS (DO NOT IGNORE ANY):**
-  - The test **MUST** be written using **Mocha** as the test runner.
-  - The test **MUST** use **Chai** for assertions.
-  - The test **MUST** use **Supertest** for API requests.
-  - The test **MUST** manage database state using **Sequelize transactions**.
-  - The test **MUST** ensure **ALL POSSIBLE CASES, including both SUCCESS and FAILURE scenarios, are covered completely**.
-  - **DO NOT SKIP ANY CONTENTS OR EDGE CASES**.
-  - **DO NOT** wrap the output inside code blocks like \`\`\`typescript.
-  - **The output MUST ONLY contain valid TypeScript Mocha test code—NO COMMENTS, NO EXPLANATIONS, NO EXTRA TEXT.**
-  - **FAILURE TO FOLLOW THESE INSTRUCTIONS WILL BE CONSIDERED AN ERROR.**
+  MANDATORY REQUIREMENTS (DO NOT IGNORE ANY):
+  - The test MUST be written using Mocha as the test runner.
+  - The test MUST use Chai for assertions.
+  - The test MUST use Supertest for API requests.
+  - The test MUST manage database state using Sequelize transactions.
+  - The test MUST ensure ALL POSSIBLE CASES, including both SUCCESS and FAILURE scenarios, are covered completely.
+  - DO NOT SKIP ANY CONTENTS OR EDGE CASES.
+  - DO NOT wrap the output inside code blocks like \`\`\`typescript.
+  - The output MUST ONLY contain valid TypeScript Mocha test code—NO COMMENTS, NO EXPLANATIONS, NO EXTRA TEXT.
+  - FAILURE TO FOLLOW THESE INSTRUCTIONS WILL BE CONSIDERED AN ERROR.
 
-  **ADDITIONAL MANDATORY FIXES TO AVOID COMMON ERRORS:**
-  1. **Ensure correct relative imports:**
-     - The test file **MUST** use '../../../src/...' instead of '@src/'.
+  ADDITIONAL MANDATORY FIXES TO AVOID COMMON ERRORS:
+  1. Ensure correct relative imports:
+     - The test file MUST use '../../../src/...' instead of '@src/'.
      - Example:
-       ✅ **Correct:**
+       ✅ Correct:
        \`import { createRouter } from '../../../src/infrastructure/webserver/express/routes';\`  
-       ❌ **Incorrect:**
+       ❌ Incorrect:
        \`import { createRouter } from '@src/infrastructure/webserver/express/routes';\`
 
-  2. **Ensure Sequelize handles transactions correctly:**
-     - The test **MUST** use transaction management for inserting and rolling back test data.
+  2. Ensure Sequelize handles transactions correctly:
+     - The test MUST use transaction management for inserting and rolling back test data.
      - Example:
-       \`await startTransaction((transaction) => beforeHookFixtures(transaction));\`
-     - The test **MUST** properly close transactions after tests.
+       \`import { Transaction } from 'sequelize'; let transaction: Transaction;\`
+     - The test MUST properly close transactions after tests.
 
-  3. **Ensure Mocha resolves paths properly:**
-     - The test **MUST** import modules using '../../../src/...'.
-     - The test **MUST NOT** use module aliases.
+  3. Ensure Mocha resolves paths properly:
+     - The test MUST import modules using '../../../src/...'.
+     - The test MUST NOT use module aliases.
 
-  4. **Ensure database fixtures are used for consistent test data:**
-     - The test **MUST** use \`insertFixture\` to preload necessary data.
-     - Example:
-       \`await insertFixture("insertBasicChargePlanSummary.sql", transaction);\`
-
-  5. **Ensure test output is not wrapped in code blocks:**
+  4. Ensure test output is not wrapped in code blocks:
      - The generated test MUST not wrap the test code inside TypeScript code blocks like \`\`\`\typescript\`\`\`. It should be plain TypeScript code without any wrapping.
 
-  **Final Note:**
-  - The generated test file **MUST** run successfully in a TypeScript project using Mocha, Chai, and Sequelize.
-  - **STRICTLY FOLLOW THESE INSTRUCTIONS OR THE OUTPUT WILL BE CONSIDERED INCORRECT.**
+  5. Ensure Express App Initialization:
+   - The test MUST import and initialize the Express app like this:
+   \`\`\`typescript
+   import express from 'express';
+   const app = express();
+   BasicChargeRoutes(app);
+   \`\`\`
+   - DO NOT use alternative app setup methods. Ensure this structure is maintained for all tests.
+
+  Final Note:
+  - The generated test file MUST run successfully in a TypeScript project using Mocha, Chai, and Sequelize.
+  - STRICTLY FOLLOW THESE INSTRUCTIONS OR THE OUTPUT WILL BE CONSIDERED INCORRECT.
 
   NOW, GENERATE THE TEST.
-`;
-
+`
 
   try {
     // Step 14: Sending API Requests to OpenAI for Integration Test
@@ -282,107 +292,96 @@ async function generateTest(
       frequency_penalty: 0,
       presence_penalty: 0,
     })
+    console.log(integrationResponse.model)
 
     // Step 15: Saving the Generated Integration Test
-    if (integrationResponse?.choices?.[0]?.message?.content) {
-      const filePath = path.join(testOutputDir, "integration", fileName)
-      fs.mkdirSync(path.dirname(filePath), { recursive: true })
-      fs.writeFileSync(filePath, integrationResponse.choices[0].message.content.trim(), { encoding: "utf8" })
-      console.log(`✅ Generated Integration Test: ${filePath}`)
-    }
+    // if (integrationResponse?.choices?.[0]?.message?.content) {
+    //   const filePath = path.join(testOutputDir, "integration", fileName)
+    //   fs.mkdirSync(path.dirname(filePath), { recursive: true })
+    //   fs.writeFileSync(filePath, integrationResponse.choices[0].message.content.trim(), { encoding: "utf8" })
+    //   console.log(`✅ Generated Integration Test: ${filePath}`)
+    // }
   } catch (error) {
     console.error(`❌ Error generating tests for ${fileName}:`, error)
   }
 
   // Step 16: Creating a Unit Test Prompt
   const unitPrompt = `
-   STRICTLY FOLLOW THE INSTRUCTIONS BELOW WITHOUT EXCEPTION:
+STRICTLY FOLLOW THE INSTRUCTIONS BELOW WITHOUT EXCEPTION:
 
-  Given the following TypeScript files, you MUST generate test cases for ONLY the specified **API Path**:
+Given the following TypeScript files, you MUST generate unit test cases for ONLY the specified Use Case:
 
-   **API Path:**
-  \`\`\`typescript
-  ${apiPath}
-  \`\`\`
+Use Case:
+\`\`\`typescript
+${useCaseCode}
+\`\`\`
 
-  **Route:**
-  \`\`\`typescript
-  ${routeCode}
-  \`\`\`
+Repository: ${repoName}
+\`\`\`typescript
+${repositoryCode}
+\`\`\`
 
-  **Controller:**
-  \`\`\`typescript
-  ${controllerCode}
-  \`\`\`
+Port:
+\`\`\`typescript
+${portCode}
+\`\`\`
 
-  **Use Case:**
-  \`\`\`typescript
-  ${useCaseCode}
-  \`\`\`
+Entity:
+\`\`\`typescript
+${entityCode}
+\`\`\`
 
-  **Repository:**
-  \`\`\`typescript
-  ${repositoryCode}
-  \`\`\`
+DTO:
+\`\`\`typescript
+${dtoCode}
+\`\`\`
 
-  **Port:**
-  \`\`\`typescript
-  ${portCode}
-  \`\`\`
+YOU MUST GENERATE a complete and exhaustive set of unit tests consisting of a minimum of 20 test cases for the given use case in TypeScript. The test cases should focus on the logic of the use case and cover all relevant scenarios.
 
-  **Entity:**
-  \`\`\`typescript
-  ${entityCode}
-  \`\`\`
+MANDATORY REQUIREMENTS (DO NOT IGNORE ANY):
+- The test MUST be written using Mocha as the test runner.
+- The test MUST use Chai for assertions.
+- The test MUST use Sinon for mocking dependencies.
+- The test MUST mock any external dependencies or services used by the use case.
+- The test MUST cover both SUCCESS and FAILURE scenarios, including edge cases and any potential exceptions that may occur in the use case logic.
+- DO NOT skip any content or edge cases.
+- DO NOT wrap the output inside code blocks like \`\`\`typescript.
+- The output MUST ONLY contain valid TypeScript Mocha test code—NO COMMENTS, NO EXPLANATIONS, NO EXTRA TEXT.
+- FAILURE TO FOLLOW THESE INSTRUCTIONS WILL BE CONSIDERED AN ERROR.
 
-  **DTO:**
-  \`\`\`typescript
-  ${dtoCode}
-  \`\`\`
+ADDITIONAL MANDATORY FIXES TO AVOID COMMON ERRORS:
+1. Ensure correct relative imports:
+   - The test file MUST use '../../../src/...' instead of '@src/'.
+   - Example:
+     ✅ Correct:
+     \`import { MyUseCase } from '../../../src/application/use_cases/MyUseCase';\`  
+     ❌ Incorrect:
+     \`import { MyUseCase } from '@src/application/use_cases/MyUseCase';\`
 
-  YOU MUST GENERATE a **complete and exhaustive unit test consisting of a minimum of 20 test cases, focusing only on the Use Case file** in TypeScript.
+2. Ensure Mocha and Chai handle assertions and spies/mocks correctly:
+   - The test MUST use Chai assertions (e.g., \`expect\`, \`assert\`, or \`should\`).
+   - The test MUST use Sinon for mocking dependencies, like the repository or external services.
+   - Example:
+     \`import { sinon } from 'sinon';\`
 
-  **MANDATORY REQUIREMENTS (DO NOT IGNORE ANY):**
-  - The test **MUST** be written using **Mocha** as the test runner.
-  - The test **MUST** use **Chai** for assertions.
-  - The test **MUST** ensure that **the Repository is properly mocked**.
-  - The test **MUST** include both **successful and failure cases**.
-  - **DO NOT SKIP ANY CONTENTS OR EDGE CASES**.
-  - **DO NOT** wrap the output inside code blocks like \`\`\`typescript.
-  - **The output MUST ONLY contain valid TypeScript Mocha test code—NO COMMENTS, NO EXPLANATIONS, NO EXTRA TEXT.**
-  - **FAILURE TO FOLLOW THESE INSTRUCTIONS WILL BE CONSIDERED AN ERROR.**
+3. Ensure the use case is tested in isolation:
+   - The test MUST isolate the use case from the repository and other external dependencies using mocks or stubs.
+   - Example:
+     \`const repoMock = sinon.stub();\`
 
-  **ADDITIONAL MANDATORY FIXES TO AVOID COMMON ERRORS:**
-  1. **Ensure correct relative imports:**
-     - The test file **MUST** use '../../../src/...' instead of '@src/'.
-     - Example:
-       ✅ **Correct:**
-       \`import { getPaymentRecordByIdNameUseCase } from '../../../src/application/use_cases/paymentRecord/getPaymentRecordByIdNameUseCase';\`  
-       ❌ **Incorrect:**
-       \`import { getPaymentRecordByIdNameUseCase } from '@src/application/use_cases/paymentRecord/getPaymentRecordByIdNameUseCase';\`
+4. Ensure test output is not wrapped in code blocks:
+   - The generated test MUST not wrap the test code inside TypeScript code blocks like \`\`\`\typescript\`\`\`. It should be plain TypeScript code without any wrapping.
 
-  2. **Ensure proper repository mocking:**
-     - The test **MUST** mock repository methods.
+5. Ensure proper test structure:
+   - The test MUST contain setup (e.g., mocks), action (e.g., calling the use case method), and assertion (e.g., checking results).
+   - Ensure that each test case is self-contained, and proper mocks are restored after tests to prevent side effects.
 
-  3. **Ensure Mocha resolves paths properly:**
-     - The test **MUST** import modules using '../../../src/...'.
-     - The test **MUST NOT** use module aliases.
+Final Note:
+- The generated test file MUST run successfully in a TypeScript project using Mocha, Chai, and Sinon for mocking.
+- STRICTLY FOLLOW THESE INSTRUCTIONS OR THE OUTPUT WILL BE CONSIDERED INCORRECT.
 
-  4. **Ensure database fixtures are used for consistent test data (if required):**
-     - The test **MUST** use \`insertFixture\` to preload necessary data.
-     - Example:
-       \`await insertFixture("insertBasicChargePlanSummary.sql", transaction);\`
-
-  5. **Ensure test output is not wrapped in code blocks:**
-     - The generated test MUST not wrap the test code inside TypeScript code blocks like \`\`\`\typescript\`\`\`. It should be plain TypeScript code without any wrapping.
-
-  **Final Note:**
-  - The generated test file **MUST** run successfully in a TypeScript project using Mocha and Chai.
-  - **STRICTLY FOLLOW THESE INSTRUCTIONS OR THE OUTPUT WILL BE CONSIDERED INCORRECT.**
-
-  NOW, GENERATE THE TEST.
-`;
-
+NOW, GENERATE THE TEST.
+`
 
   try {
     // Step 17: Sending API Requests to OpenAI for Unit Test
@@ -395,6 +394,7 @@ async function generateTest(
       frequency_penalty: 0,
       presence_penalty: 0,
     })
+
     console.log(unitResponse.model)
 
     // Step 18: Saving the Generated Unit Test
@@ -411,11 +411,12 @@ async function generateTest(
 
 // Step 19: Generate All Tests
 async function generateAllTests() {
-  for (const { name, apiPath, controller, useCase, repo, port, entity, dto, route } of detectedTestFiles) {
+  for (const { name, apiPath, controller, useCase, repoName, repo, port, entity, dto, route } of detectedTestFiles) {
     console.log(`Generating test for: ${name}`)
     console.log(`  apiPath: ${apiPath}`)
     console.log(`  Controller: ${controller}`)
     console.log(`  Use Case: ${useCase}`)
+    console.log(`  Repo Name: ${repoName}`)
     console.log(`  Repository: ${repo}`)
     console.log(`  Port: ${port}`)
     console.log(`  Entity: ${entity}`)
@@ -426,6 +427,7 @@ async function generateAllTests() {
       apiPath,
       controller,
       useCase || null,
+      repoName,
       repo || null,
       port || null,
       entity || null,
