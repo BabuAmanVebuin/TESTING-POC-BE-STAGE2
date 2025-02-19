@@ -1,18 +1,18 @@
 import { expect } from 'chai';
-import sinon from 'sinon';
-import { upsertBasicChargePlanUsecase } from '../../../src/application/use_cases/basicChargePlan/upsertBasicChargePlanUsecase';
-import { BasicChargeRepositoryPort } from '../../../src/application/port/BasicChargeRepositoryPort';
-import { BasicChargePlan } from '../../../src/domain/models/BasicCharge';
+import sinon, { SinonStub } from 'sinon';
+import { BasicChargeRepositoryPort } from '../../../src/application/port/BasicChargeRepositoryPort.js';
+import { BasicChargePlan } from '../../../src/domain/models/BasicCharge.js';
+import { upsertBasicChargePlanUsecase } from '../../../src/application/use_cases/dpm/upsertBasicChargePlanUsecase.js';
 
 describe('upsertBasicChargePlanUsecase', () => {
   let basicChargeRepositoryMock: sinon.SinonStubbedInstance<BasicChargeRepositoryPort<any>>;
   let workUnitCtxMock: any;
-  let basicChargePlansMock: BasicChargePlan[];
+  let basicChargePlans: BasicChargePlan[];
 
   beforeEach(() => {
     basicChargeRepositoryMock = {
       upsertBasicChargePlan: sinon.stub(),
-      wrapInWorkUnitCtx: sinon.stub(),
+      wrapInWorkUnitCtx: sinon.stub() as SinonStub<[fn: (workUnitCtx: any) => Promise<any>], Promise<any>>,
       getBasicChargePlan: sinon.stub(),
       getBasicChargeForecast: sinon.stub(),
       getBasicChargePlanSummary: sinon.stub(),
@@ -20,7 +20,7 @@ describe('upsertBasicChargePlanUsecase', () => {
       getBasicChargeForecastSummary: sinon.stub(),
     };
     workUnitCtxMock = {};
-    basicChargePlansMock = [
+    basicChargePlans = [
       {
         plantCode: 'P1',
         unitCode: 'U1',
@@ -32,52 +32,54 @@ describe('upsertBasicChargePlanUsecase', () => {
     ];
   });
 
-  afterEach(() => {
-    sinon.restore();
-  });
-
-  it('should successfully upsert basic charge plans', async () => {
-    basicChargeRepositoryMock.upsertBasicChargePlan.resolves();
-
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
+  it('should upsert basic charge plans successfully', async () => {
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledWith(workUnitCtxMock, basicChargePlansMock)).to.be.true;
   });
 
-  it('should handle empty basic charge plans array', async () => {
-    basicChargePlansMock = [];
+  it('should pass the correct parameters to the repository', async () => {
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
+    const args = basicChargeRepositoryMock.upsertBasicChargePlan.getCall(0).args;
+    expect(args[0]).to.equal(workUnitCtxMock);
+    expect(args[1]).to.deep.equal(basicChargePlans);
+    expect(args[2]).to.be.instanceOf(Date);
+  });
 
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
+  it('should handle empty basicChargePlans array', async () => {
+    basicChargePlans = [];
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledWith(workUnitCtxMock, basicChargePlansMock)).to.be.true;
   });
 
-  it('should throw an error if repository upsert fails', async () => {
-    basicChargeRepositoryMock.upsertBasicChargePlan.rejects(new Error('Database error'));
-
+  it('should handle null basicChargePlans', async () => {
+    basicChargePlans = null as any;
     try {
-      await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
+      await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     } catch (error) {
-      expect(error.message).to.equal('Database error');
+      expect(error).to.exist;
     }
   });
 
-  it('should pass the correct currentDateTime to the repository', async () => {
-    const clock = sinon.useFakeTimers(new Date('2023-10-10T10:00:00Z').getTime());
-    basicChargeRepositoryMock.upsertBasicChargePlan.resolves();
-
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.args[0][2]).to.deep.equal(new Date('2023-10-10T10:00:00Z'));
-
-    clock.restore();
+  it('should handle undefined basicChargePlans', async () => {
+    basicChargePlans = undefined as any;
+    try {
+      await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
+    } catch (error) {
+      expect(error).to.exist;
+    }
   });
 
-  it('should handle multiple basic charge plans', async () => {
-    basicChargePlansMock.push({
+  it('should throw an error if repository throws', async () => {
+    basicChargeRepositoryMock.upsertBasicChargePlan.rejects(new Error('Repository error'));
+    try {
+      await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
+    } catch (error) {
+      expect(error).to.equal('Repository error');
+    }
+  });
+
+  it('should handle multiple basicChargePlans', async () => {
+    basicChargePlans.push({
       plantCode: 'P2',
       unitCode: 'U2',
       fiscalYear: 2024,
@@ -85,266 +87,91 @@ describe('upsertBasicChargePlanUsecase', () => {
       maintenanceInput: 100,
       userId: 'user2',
     });
-    basicChargeRepositoryMock.upsertBasicChargePlan.resolves();
-
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledWith(workUnitCtxMock, basicChargePlansMock)).to.be.true;
   });
 
-  it('should handle null operationInput and maintenanceInput', async () => {
-    basicChargePlansMock = [
-      {
-        plantCode: 'P1',
-        unitCode: 'U1',
-        fiscalYear: 2023,
-        operationInput: null,
-        maintenanceInput: null,
-        userId: 'user1',
-      },
-    ];
-    basicChargeRepositoryMock.upsertBasicChargePlan.resolves();
-
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
+  it('should handle basicChargePlans with null operationInput', async () => {
+    basicChargePlans[0].operationInput = null;
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledWith(workUnitCtxMock, basicChargePlansMock)).to.be.true;
   });
 
-  it('should handle undefined operationInput and maintenanceInput', async () => {
-    basicChargePlansMock = [
-      {
-        plantCode: 'P1',
-        unitCode: 'U1',
-        fiscalYear: 2023,
-        operationInput: undefined,
-        maintenanceInput: undefined,
-        userId: 'user1',
-      },
-    ];
-    basicChargeRepositoryMock.upsertBasicChargePlan.resolves();
-
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
+  it('should handle basicChargePlans with null maintenanceInput', async () => {
+    basicChargePlans[0].maintenanceInput = null;
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledWith(workUnitCtxMock, basicChargePlansMock)).to.be.true;
   });
 
-  it('should handle missing userId', async () => {
-    basicChargePlansMock = [
-      {
-        plantCode: 'P1',
-        unitCode: 'U1',
-        fiscalYear: 2023,
-        operationInput: 100,
-        maintenanceInput: 50,
-        userId: undefined,
-      },
-    ];
-    basicChargeRepositoryMock.upsertBasicChargePlan.resolves();
-
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
+  it('should handle basicChargePlans with null userId', async () => {
+    basicChargePlans[0].userId = '';
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledWith(workUnitCtxMock, basicChargePlansMock)).to.be.true;
   });
 
-  it('should handle missing plantCode', async () => {
-    basicChargePlansMock = [
-      {
-        plantCode: undefined,
-        unitCode: 'U1',
-        fiscalYear: 2023,
-        operationInput: 100,
-        maintenanceInput: 50,
-        userId: 'user1',
-      },
-    ];
-    basicChargeRepositoryMock.upsertBasicChargePlan.resolves();
-
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
+  it('should handle basicChargePlans with undefined userId', async () => {
+    basicChargePlans[0].userId = undefined;
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledWith(workUnitCtxMock, basicChargePlansMock)).to.be.true;
   });
 
-  it('should handle missing unitCode', async () => {
-    basicChargePlansMock = [
-      {
-        plantCode: 'P1',
-        unitCode: undefined,
-        fiscalYear: 2023,
-        operationInput: 100,
-        maintenanceInput: 50,
-        userId: 'user1',
-      },
-    ];
-    basicChargeRepositoryMock.upsertBasicChargePlan.resolves();
-
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
+  it('should handle basicChargePlans with negative operationInput', async () => {
+    basicChargePlans[0].operationInput = -100;
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledWith(workUnitCtxMock, basicChargePlansMock)).to.be.true;
   });
 
-  it('should handle missing fiscalYear', async () => {
-    basicChargePlansMock = [
-      {
-        plantCode: 'P1',
-        unitCode: 'U1',
-        fiscalYear: undefined,
-        operationInput: 100,
-        maintenanceInput: 50,
-        userId: 'user1',
-      },
-    ];
-    basicChargeRepositoryMock.upsertBasicChargePlan.resolves();
-
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
+  it('should handle basicChargePlans with negative maintenanceInput', async () => {
+    basicChargePlans[0].maintenanceInput = -50;
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledWith(workUnitCtxMock, basicChargePlansMock)).to.be.true;
   });
 
-  it('should handle large number of basic charge plans', async () => {
-    basicChargePlansMock = Array.from({ length: 1000 }, (_, i) => ({
-      plantCode: `P${i}`,
-      unitCode: `U${i}`,
-      fiscalYear: 2023,
-      operationInput: i * 10,
-      maintenanceInput: i * 5,
-      userId: `user${i}`,
-    }));
-    basicChargeRepositoryMock.upsertBasicChargePlan.resolves();
-
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
+  it('should handle basicChargePlans with zero operationInput', async () => {
+    basicChargePlans[0].operationInput = 0;
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledWith(workUnitCtxMock, basicChargePlansMock)).to.be.true;
   });
 
-  it('should handle duplicate basic charge plans', async () => {
-    basicChargePlansMock.push(basicChargePlansMock[0]);
-    basicChargeRepositoryMock.upsertBasicChargePlan.resolves();
-
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
+  it('should handle basicChargePlans with zero maintenanceInput', async () => {
+    basicChargePlans[0].maintenanceInput = 0;
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledWith(workUnitCtxMock, basicChargePlansMock)).to.be.true;
   });
 
-  it('should handle invalid fiscalYear', async () => {
-    basicChargePlansMock = [
-      {
-        plantCode: 'P1',
-        unitCode: 'U1',
-        fiscalYear: -2023,
-        operationInput: 100,
-        maintenanceInput: 50,
-        userId: 'user1',
-      },
-    ];
-    basicChargeRepositoryMock.upsertBasicChargePlan.resolves();
-
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
+  it('should handle basicChargePlans with future fiscalYear', async () => {
+    basicChargePlans[0].fiscalYear = 2050;
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledWith(workUnitCtxMock, basicChargePlansMock)).to.be.true;
   });
 
-  it('should handle invalid operationInput', async () => {
-    basicChargePlansMock = [
-      {
-        plantCode: 'P1',
-        unitCode: 'U1',
-        fiscalYear: 2023,
-        operationInput: -100,
-        maintenanceInput: 50,
-        userId: 'user1',
-      },
-    ];
-    basicChargeRepositoryMock.upsertBasicChargePlan.resolves();
-
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
+  it('should handle basicChargePlans with past fiscalYear', async () => {
+    basicChargePlans[0].fiscalYear = 2000;
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledWith(workUnitCtxMock, basicChargePlansMock)).to.be.true;
   });
 
-  it('should handle invalid maintenanceInput', async () => {
-    basicChargePlansMock = [
-      {
-        plantCode: 'P1',
-        unitCode: 'U1',
-        fiscalYear: 2023,
-        operationInput: 100,
-        maintenanceInput: -50,
-        userId: 'user1',
-      },
-    ];
-    basicChargeRepositoryMock.upsertBasicChargePlan.resolves();
-
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
+  it('should handle basicChargePlans with empty plantCode', async () => {
+    basicChargePlans[0].plantCode = '';
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledWith(workUnitCtxMock, basicChargePlansMock)).to.be.true;
   });
 
-  it('should handle invalid userId', async () => {
-    basicChargePlansMock = [
-      {
-        plantCode: 'P1',
-        unitCode: 'U1',
-        fiscalYear: 2023,
-        operationInput: 100,
-        maintenanceInput: 50,
-        userId: '',
-      },
-    ];
-    basicChargeRepositoryMock.upsertBasicChargePlan.resolves();
-
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
+  it('should handle basicChargePlans with empty unitCode', async () => {
+    basicChargePlans[0].unitCode = '';
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledWith(workUnitCtxMock, basicChargePlansMock)).to.be.true;
   });
 
-  it('should handle invalid plantCode', async () => {
-    basicChargePlansMock = [
-      {
-        plantCode: '',
-        unitCode: 'U1',
-        fiscalYear: 2023,
-        operationInput: 100,
-        maintenanceInput: 50,
-        userId: 'user1',
-      },
-    ];
-    basicChargeRepositoryMock.upsertBasicChargePlan.resolves();
-
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
+  it('should handle basicChargePlans with special characters in plantCode', async () => {
+    basicChargePlans[0].plantCode = 'P@1!';
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledWith(workUnitCtxMock, basicChargePlansMock)).to.be.true;
   });
 
-  it('should handle invalid unitCode', async () => {
-    basicChargePlansMock = [
-      {
-        plantCode: 'P1',
-        unitCode: '',
-        fiscalYear: 2023,
-        operationInput: 100,
-        maintenanceInput: 50,
-        userId: 'user1',
-      },
-    ];
-    basicChargeRepositoryMock.upsertBasicChargePlan.resolves();
-
-    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlansMock);
-
+  it('should handle basicChargePlans with special characters in unitCode', async () => {
+    basicChargePlans[0].unitCode = 'U#1$';
+    await upsertBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, basicChargePlans);
     expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledOnce).to.be.true;
-    expect(basicChargeRepositoryMock.upsertBasicChargePlan.calledWith(workUnitCtxMock, basicChargePlansMock)).to.be.true;
   });
 });

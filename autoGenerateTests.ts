@@ -13,7 +13,7 @@ const openai = new OpenAI({
 })
 
 // Step 4: Define Paths to Different Files
-const controllersDir = path.join(__dirname, "./src/interface/controllers/dpm/KPI003")
+const controllersDir = path.join(__dirname, "./src/interface/controllers/dpm")
 const useCasesDir = path.join(__dirname, "./src/application/use_cases/dpm")
 const repositoriesDir = path.join(__dirname, "./src/infrastructure/repositories/dpm")
 const portDir = path.join(__dirname, "./src/application/port")
@@ -45,12 +45,13 @@ const detectedControllers = getAllTsFiles(controllersDir)
 // Step 9: Define the mapping between use cases and their corresponding files (repository, port, entity, dto, route)
 function getFileMapping(): Record<
   string,
-  { apiPath: string; repoName: string; repo: string[]; port: string[]; entity: string[]; dto: string; route: string }
+  { apiPath: string; repoName: string; useCase: string; repo: string[]; port: string[]; entity: string[]; dto: string; route: string }
 > {
   return {
     getBasicChargePlan: {
       apiPath: "GET /basic-charge/plan",
       repoName: "getBasicChargePlan",
+      useCase: "getBasicChargePlanUsecase.ts",
       repo: ["BasicChargeRepositorySequelizeMySQL.ts"],
       port: ["BasicChargeRepositoryPort.ts"],
       entity: [],
@@ -60,6 +61,7 @@ function getFileMapping(): Record<
     upsertBasicChargePlan: {
       apiPath: "PUT /basic-charge/plan",
       repoName: "upsertBasicChargePlan",
+      useCase: "upsertBasicChargePlanUsecase.ts",
       repo: ["BasicChargeRepositorySequelizeMySQL.ts"],
       port: ["BasicChargeRepositoryPort.ts"],
       entity: [],
@@ -69,6 +71,7 @@ function getFileMapping(): Record<
     getBasicChargePlanSummary: {
       apiPath: "GET /basic-charge/plan/summary",
       repoName: "getBasicChargePlanSummary",
+      useCase: "getBasicChargePlanSummaryUsecase.ts",
       repo: ["BasicChargeRepositorySequelizeMySQL.ts"],
       port: ["BasicChargeRepositoryPort.ts"],
       entity: [],
@@ -86,13 +89,11 @@ const detectedTestFiles = detectedControllers.map((controllerPath) => {
   const controllerFile = path.relative(controllersDir, controllerPath)
   const baseName = path.basename(controllerFile, ".ts").replace("Controller", "")
 
-  const useCaseFile = path.join(path.dirname(controllerFile), `${baseName}UseCase.ts`)
-  const useCasePath = useCaseFile ? path.join(useCasesDir, useCaseFile) : ""
-
   // Get file mappings for the base controller name
   const files = fileMap[baseName] || {
     apiPath: "",
     repoName: "",
+    useCase: "",
     repo: [],
     port: [],
     entity: [],
@@ -101,6 +102,7 @@ const detectedTestFiles = detectedControllers.map((controllerPath) => {
   }
 
   // Map the repository, port, entity, dto, and route paths
+  const useCasePath = files.useCase ? path.join(useCasesDir, files.useCase) : ""
   const repoPath = files.repo.map((repo) => path.join(repositoriesDir, repo))
   const portPath = files.port.map((port) => path.join(portDir, port))
   const entityPath = files.entity.map((entity) => path.join(entityDir, entity))
@@ -108,7 +110,7 @@ const detectedTestFiles = detectedControllers.map((controllerPath) => {
   const routePath = files.route ? path.join(routeDir, files.route) : ""
 
   // Check if the required files exist
-  const useCaseExists = fs.existsSync(useCasePath)
+  const useCaseExists = useCasePath && fs.existsSync(useCasePath)
   const repoExists = repoPath && repoPath.every((repo) => fs.existsSync(repo))
   const portExists = portPath && portPath.every((port) => fs.existsSync(port))
   const entityExists = entityPath && entityPath.every((entity) => fs.existsSync(entity))
@@ -118,7 +120,7 @@ const detectedTestFiles = detectedControllers.map((controllerPath) => {
   console.log(`📝 Checking: ${baseName}`)
   console.log(`  🔹 API Path: ${files.apiPath || "N/A"} → Exists? ${files.apiPath ? true : false}`)
   console.log(`  🔹 Controller: ${controllerFile}`)
-  console.log(`  🔹 Use Case: ${useCaseFile} → Exists? ${useCaseExists}`)
+  console.log(`  🔹 Use Case: ${files.useCase || "N/A"} → Exists? ${useCaseExists}`)
   console.log(`  🔹 API Path: ${files.repoName || "N/A"} → Exists? ${files.repoName ? true : false}`)
   console.log(`  🔹 Repository: ${files.repo || "N/A"} → Exists? ${repoExists}`)
   console.log(`  🔹 Port: ${files.port || "N/A"} → Exists? ${portExists}`)
@@ -130,7 +132,7 @@ const detectedTestFiles = detectedControllers.map((controllerPath) => {
     name: `${baseName}.test.ts`,
     apiPath: files.apiPath,
     controller: controllerFile,
-    useCase: useCaseExists ? useCaseFile : null,
+    useCase: useCaseExists ? files.useCase : null,
     repoName: files.repoName,
     repo: repoExists ? files.repo : null,
     port: portExists ? files.port : null,
@@ -340,7 +342,6 @@ YOU MUST GENERATE a complete and exhaustive set of unit tests consisting of a mi
 MANDATORY REQUIREMENTS (DO NOT IGNORE ANY):
 - The test MUST be written using Mocha as the test runner.
 - The test MUST use Chai for assertions.
-- The test MUST use Sinon for mocking dependencies.
 - The test MUST mock any external dependencies or services used by the use case.
 - The test MUST cover both SUCCESS and FAILURE scenarios, including edge cases and any potential exceptions that may occur in the use case logic.
 - DO NOT skip any content or edge cases.
@@ -357,16 +358,12 @@ ADDITIONAL MANDATORY FIXES TO AVOID COMMON ERRORS:
      ❌ Incorrect:
      \`import { MyUseCase } from '@src/application/use_cases/MyUseCase';\`
 
-2. Ensure Mocha and Chai handle assertions and spies/mocks correctly:
+2. Ensure Mocha and Chai handle assertions correctly:
    - The test MUST use Chai assertions (e.g., \`expect\`, \`assert\`, or \`should\`).
-   - The test MUST use Sinon for mocking dependencies, like the repository or external services.
-   - Example:
-     \`import { sinon } from 'sinon';\`
 
 3. Ensure the use case is tested in isolation:
-   - The test MUST isolate the use case from the repository and other external dependencies using mocks or stubs.
-   - Example:
-     \`const repoMock = sinon.stub();\`
+   - The test MUST mock any dependencies, like the repository or external services.
+   - The test MUST isolate the use case from the repository and other external dependencies.
 
 4. Ensure test output is not wrapped in code blocks:
    - The generated test MUST not wrap the test code inside TypeScript code blocks like \`\`\`\typescript\`\`\`. It should be plain TypeScript code without any wrapping.
@@ -376,7 +373,7 @@ ADDITIONAL MANDATORY FIXES TO AVOID COMMON ERRORS:
    - Ensure that each test case is self-contained, and proper mocks are restored after tests to prevent side effects.
 
 Final Note:
-- The generated test file MUST run successfully in a TypeScript project using Mocha, Chai, and Sinon for mocking.
+- The generated test file MUST run successfully in a TypeScript project using Mocha, Chai.
 - STRICTLY FOLLOW THESE INSTRUCTIONS OR THE OUTPUT WILL BE CONSIDERED INCORRECT.
 
 NOW, GENERATE THE TEST.
