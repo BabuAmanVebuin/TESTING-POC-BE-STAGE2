@@ -292,15 +292,14 @@ async function generateTest(
       frequency_penalty: 0,
       presence_penalty: 0,
     })
-    console.log(integrationResponse.model)
 
     // Step 15: Saving the Generated Integration Test
-    // if (integrationResponse?.choices?.[0]?.message?.content) {
-    //   const filePath = path.join(testOutputDir, "integration", fileName)
-    //   fs.mkdirSync(path.dirname(filePath), { recursive: true })
-    //   fs.writeFileSync(filePath, integrationResponse.choices[0].message.content.trim(), { encoding: "utf8" })
-    //   console.log(`✅ Generated Integration Test: ${filePath}`)
-    // }
+    if (integrationResponse?.choices?.[0]?.message?.content) {
+      const filePath = path.join(testOutputDir, "integration", fileName)
+      fs.mkdirSync(path.dirname(filePath), { recursive: true })
+      fs.writeFileSync(filePath, integrationResponse.choices[0].message.content.trim(), { encoding: "utf8" })
+      console.log(`✅ Generated Integration Test: ${filePath}`)
+    }
   } catch (error) {
     console.error(`❌ Error generating tests for ${fileName}:`, error)
   }
