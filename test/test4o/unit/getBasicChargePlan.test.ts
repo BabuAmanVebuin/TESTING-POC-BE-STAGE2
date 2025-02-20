@@ -1,11 +1,11 @@
 import { expect } from 'chai';
-import { getBasicChargePlanUsecase } from '../../../src/application/use_cases/dpm/getBasicChargePlanUsecase.js';
-import { BasicChargeRepositoryPort } from '../../../src/application/port/BasicChargeRepositoryPort.js';
+import { getBasicChargePlanUsecase } from '../../../src/application/use_cases/dpm/getBasicChargePlanUsecase';
+import { BasicChargeRepositoryPort } from '../../../src/application/port/BasicChargeRepositoryPort';
 import sinon, { SinonStub } from 'sinon';
 
 describe('getBasicChargePlanUsecase', () => {
   let basicChargeRepositoryMock: sinon.SinonStubbedInstance<BasicChargeRepositoryPort<any>>;
-  let workUnitCtx: any;
+  let workUnitCtxMock: any;
 
   beforeEach(() => {
     basicChargeRepositoryMock = {
@@ -17,7 +17,7 @@ describe('getBasicChargePlanUsecase', () => {
       upsertBasicChargeForecast: sinon.stub(),
       getBasicChargeForecastSummary: sinon.stub(),
     };
-    workUnitCtx = {};
+    workUnitCtxMock = {};
   });
 
   afterEach(() => {
@@ -26,12 +26,12 @@ describe('getBasicChargePlanUsecase', () => {
 
   it('should return an empty array when no data is found', async () => {
     basicChargeRepositoryMock.getBasicChargePlan.resolves([]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1');
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1');
     expect(result).to.deep.equal([]);
   });
 
-  it('should map data correctly when data is found', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.resolves([
+  it('should return mapped data when data is found', async () => {
+    const mockData = [
       {
         PLANT_CODE: 'plant1',
         UNIT_CODE: 'unit1',
@@ -40,8 +40,9 @@ describe('getBasicChargePlanUsecase', () => {
         MAINTENANCE_INPUT: 200,
         SUM: 300,
       },
-    ]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1');
+    ];
+    basicChargeRepositoryMock.getBasicChargePlan.resolves(mockData);
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1');
     expect(result).to.deep.equal([
       {
         'plant-id': 'plant1',
@@ -55,17 +56,18 @@ describe('getBasicChargePlanUsecase', () => {
   });
 
   it('should handle null operation input', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.resolves([
+    const mockData = [
       {
         PLANT_CODE: 'plant1',
         UNIT_CODE: 'unit1',
         FISCAL_YEAR: 2021,
-        OPERATION_INPUT: 0,
+        OPERATION_INPUT: null,
         MAINTENANCE_INPUT: 200,
         SUM: 200,
       },
-    ]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1');
+    ];
+    basicChargeRepositoryMock.getBasicChargePlan.resolves(mockData);
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1');
     expect(result).to.deep.equal([
       {
         'plant-id': 'plant1',
@@ -79,17 +81,18 @@ describe('getBasicChargePlanUsecase', () => {
   });
 
   it('should handle null maintenance input', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.resolves([
+    const mockData = [
       {
         PLANT_CODE: 'plant1',
         UNIT_CODE: 'unit1',
         FISCAL_YEAR: 2021,
         OPERATION_INPUT: 100,
-        MAINTENANCE_INPUT: 0,
+        MAINTENANCE_INPUT: null,
         SUM: 100,
       },
-    ]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1');
+    ];
+    basicChargeRepositoryMock.getBasicChargePlan.resolves(mockData);
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1');
     expect(result).to.deep.equal([
       {
         'plant-id': 'plant1',
@@ -103,17 +106,18 @@ describe('getBasicChargePlanUsecase', () => {
   });
 
   it('should handle both null operation and maintenance inputs', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.resolves([
+    const mockData = [
       {
         PLANT_CODE: 'plant1',
         UNIT_CODE: 'unit1',
         FISCAL_YEAR: 2021,
-        OPERATION_INPUT: 0,
-        MAINTENANCE_INPUT: 0,
+        OPERATION_INPUT: null,
+        MAINTENANCE_INPUT: null,
         SUM: 0,
       },
-    ]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1');
+    ];
+    basicChargeRepositoryMock.getBasicChargePlan.resolves(mockData);
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1');
     expect(result).to.deep.equal([
       {
         'plant-id': 'plant1',
@@ -126,8 +130,8 @@ describe('getBasicChargePlanUsecase', () => {
     ]);
   });
 
-  it('should filter by unit code when provided', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.resolves([
+  it('should filter by unit code', async () => {
+    const mockData = [
       {
         PLANT_CODE: 'plant1',
         UNIT_CODE: 'unit1',
@@ -136,8 +140,9 @@ describe('getBasicChargePlanUsecase', () => {
         MAINTENANCE_INPUT: 200,
         SUM: 300,
       },
-    ]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1', 'unit1');
+    ];
+    basicChargeRepositoryMock.getBasicChargePlan.resolves(mockData);
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1', 'unit1');
     expect(result).to.deep.equal([
       {
         'plant-id': 'plant1',
@@ -150,8 +155,8 @@ describe('getBasicChargePlanUsecase', () => {
     ]);
   });
 
-  it('should filter by start fiscal year when provided', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.resolves([
+  it('should filter by start fiscal year', async () => {
+    const mockData = [
       {
         PLANT_CODE: 'plant1',
         UNIT_CODE: 'unit1',
@@ -160,8 +165,9 @@ describe('getBasicChargePlanUsecase', () => {
         MAINTENANCE_INPUT: 200,
         SUM: 300,
       },
-    ]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1', undefined, 2021);
+    ];
+    basicChargeRepositoryMock.getBasicChargePlan.resolves(mockData);
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1', undefined, 2021);
     expect(result).to.deep.equal([
       {
         'plant-id': 'plant1',
@@ -174,8 +180,8 @@ describe('getBasicChargePlanUsecase', () => {
     ]);
   });
 
-  it('should filter by end fiscal year when provided', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.resolves([
+  it('should filter by end fiscal year', async () => {
+    const mockData = [
       {
         PLANT_CODE: 'plant1',
         UNIT_CODE: 'unit1',
@@ -184,8 +190,9 @@ describe('getBasicChargePlanUsecase', () => {
         MAINTENANCE_INPUT: 200,
         SUM: 300,
       },
-    ]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1', undefined, undefined, 2021);
+    ];
+    basicChargeRepositoryMock.getBasicChargePlan.resolves(mockData);
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1', undefined, undefined, 2021);
     expect(result).to.deep.equal([
       {
         'plant-id': 'plant1',
@@ -198,8 +205,8 @@ describe('getBasicChargePlanUsecase', () => {
     ]);
   });
 
-  it('should filter by both start and end fiscal years when provided', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.resolves([
+  it('should filter by both start and end fiscal years', async () => {
+    const mockData = [
       {
         PLANT_CODE: 'plant1',
         UNIT_CODE: 'unit1',
@@ -208,8 +215,9 @@ describe('getBasicChargePlanUsecase', () => {
         MAINTENANCE_INPUT: 200,
         SUM: 300,
       },
-    ]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1', undefined, 2020, 2022);
+    ];
+    basicChargeRepositoryMock.getBasicChargePlan.resolves(mockData);
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1', undefined, 2020, 2021);
     expect(result).to.deep.equal([
       {
         'plant-id': 'plant1',
@@ -222,18 +230,8 @@ describe('getBasicChargePlanUsecase', () => {
     ]);
   });
 
-  it('should throw an error if repository throws', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.rejects(new Error('Repository error'));
-    try {
-      await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1');
-    } catch (error) {
-      expect(error).to.be.an('error');
-      expect(error).to.equal('Repository error');
-    }
-  });
-
-  it('should handle multiple records correctly', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.resolves([
+  it('should handle multiple records', async () => {
+    const mockData = [
       {
         PLANT_CODE: 'plant1',
         UNIT_CODE: 'unit1',
@@ -250,8 +248,9 @@ describe('getBasicChargePlanUsecase', () => {
         MAINTENANCE_INPUT: 250,
         SUM: 400,
       },
-    ]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1');
+    ];
+    basicChargeRepositoryMock.getBasicChargePlan.resolves(mockData);
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1');
     expect(result).to.deep.equal([
       {
         'plant-id': 'plant1',
@@ -272,8 +271,18 @@ describe('getBasicChargePlanUsecase', () => {
     ]);
   });
 
+  it('should throw an error if repository throws', async () => {
+    basicChargeRepositoryMock.getBasicChargePlan.rejects(new Error('Repository error'));
+    try {
+      await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1');
+    } catch (error) {
+      expect(error).to.be.an('error');
+      expect(error.message).to.equal('Repository error');
+    }
+  });
+
   it('should handle large numbers correctly', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.resolves([
+    const mockData = [
       {
         PLANT_CODE: 'plant1',
         UNIT_CODE: 'unit1',
@@ -282,8 +291,9 @@ describe('getBasicChargePlanUsecase', () => {
         MAINTENANCE_INPUT: 2e9,
         SUM: 3e9,
       },
-    ]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1');
+    ];
+    basicChargeRepositoryMock.getBasicChargePlan.resolves(mockData);
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1');
     expect(result).to.deep.equal([
       {
         'plant-id': 'plant1',
@@ -296,32 +306,8 @@ describe('getBasicChargePlanUsecase', () => {
     ]);
   });
 
-  it('should handle zero values correctly', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.resolves([
-      {
-        PLANT_CODE: 'plant1',
-        UNIT_CODE: 'unit1',
-        FISCAL_YEAR: 2021,
-        OPERATION_INPUT: 0,
-        MAINTENANCE_INPUT: 0,
-        SUM: 0,
-      },
-    ]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1');
-    expect(result).to.deep.equal([
-      {
-        'plant-id': 'plant1',
-        'unit-id': 'unit1',
-        'fiscal-year': 2021,
-        'operation-input': 0,
-        'maintenance-input': 0,
-        sum: 0,
-      },
-    ]);
-  });
-
-  it('should handle negative values correctly', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.resolves([
+  it('should handle negative numbers correctly', async () => {
+    const mockData = [
       {
         PLANT_CODE: 'plant1',
         UNIT_CODE: 'unit1',
@@ -330,8 +316,9 @@ describe('getBasicChargePlanUsecase', () => {
         MAINTENANCE_INPUT: -200,
         SUM: -300,
       },
-    ]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1');
+    ];
+    basicChargeRepositoryMock.getBasicChargePlan.resolves(mockData);
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1');
     expect(result).to.deep.equal([
       {
         'plant-id': 'plant1',
@@ -344,13 +331,38 @@ describe('getBasicChargePlanUsecase', () => {
     ]);
   });
 
-  it('should handle mixed null and non-null values', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.resolves([
+  it('should handle zero values correctly', async () => {
+    const mockData = [
       {
         PLANT_CODE: 'plant1',
         UNIT_CODE: 'unit1',
         FISCAL_YEAR: 2021,
         OPERATION_INPUT: 0,
+        MAINTENANCE_INPUT: 0,
+        SUM: 0,
+      },
+    ];
+    basicChargeRepositoryMock.getBasicChargePlan.resolves(mockData);
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1');
+    expect(result).to.deep.equal([
+      {
+        'plant-id': 'plant1',
+        'unit-id': 'unit1',
+        'fiscal-year': 2021,
+        'operation-input': 0,
+        'maintenance-input': 0,
+        sum: 0,
+      },
+    ]);
+  });
+
+  it('should handle mixed null and non-null inputs', async () => {
+    const mockData = [
+      {
+        PLANT_CODE: 'plant1',
+        UNIT_CODE: 'unit1',
+        FISCAL_YEAR: 2021,
+        OPERATION_INPUT: null,
         MAINTENANCE_INPUT: 200,
         SUM: 200,
       },
@@ -359,11 +371,12 @@ describe('getBasicChargePlanUsecase', () => {
         UNIT_CODE: 'unit2',
         FISCAL_YEAR: 2022,
         OPERATION_INPUT: 150,
-        MAINTENANCE_INPUT: 0,
+        MAINTENANCE_INPUT: null,
         SUM: 150,
       },
-    ]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1');
+    ];
+    basicChargeRepositoryMock.getBasicChargePlan.resolves(mockData);
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1');
     expect(result).to.deep.equal([
       {
         'plant-id': 'plant1',
@@ -384,22 +397,23 @@ describe('getBasicChargePlanUsecase', () => {
     ]);
   });
 
-  it('should handle undefined unit code', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.resolves([
+  it('should handle empty plant code', async () => {
+    const mockData = [
       {
-        PLANT_CODE: 'plant1',
+        PLANT_CODE: '',
         UNIT_CODE: 'unit1',
         FISCAL_YEAR: 2021,
         OPERATION_INPUT: 100,
         MAINTENANCE_INPUT: 200,
         SUM: 300,
       },
-    ]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1');
+    ];
+    basicChargeRepositoryMock.getBasicChargePlan.resolves(mockData);
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, '');
     expect(result).to.deep.equal([
       {
-        'plant-id': 'plant1',
-        'unit-id': undefined,
+        'plant-id': '',
+        'unit-id': 'unit1',
         'fiscal-year': 2021,
         'operation-input': 100,
         'maintenance-input': 200,
@@ -408,23 +422,24 @@ describe('getBasicChargePlanUsecase', () => {
     ]);
   });
 
-  it('should handle undefined fiscal year', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.resolves([
+  it('should handle empty unit code', async () => {
+    const mockData = [
       {
         PLANT_CODE: 'plant1',
-        UNIT_CODE: 'unit1',
-        FISCAL_YEAR: undefined,
+        UNIT_CODE: '',
+        FISCAL_YEAR: 2021,
         OPERATION_INPUT: 100,
         MAINTENANCE_INPUT: 200,
         SUM: 300,
       },
-    ]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1');
+    ];
+    basicChargeRepositoryMock.getBasicChargePlan.resolves(mockData);
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1', '');
     expect(result).to.deep.equal([
       {
         'plant-id': 'plant1',
-        'unit-id': 'unit1',
-        'fiscal-year': undefined,
+        'unit-id': '',
+        'fiscal-year': 2021,
         'operation-input': 100,
         'maintenance-input': 200,
         sum: 300,
@@ -432,50 +447,52 @@ describe('getBasicChargePlanUsecase', () => {
     ]);
   });
 
-  it('should handle undefined operation input', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.resolves([
+  it('should handle empty fiscal year', async () => {
+    const mockData = [
       {
         PLANT_CODE: 'plant1',
         UNIT_CODE: 'unit1',
-        FISCAL_YEAR: 2021,
-        OPERATION_INPUT: undefined,
+        FISCAL_YEAR: 0,
+        OPERATION_INPUT: 100,
         MAINTENANCE_INPUT: 200,
-        SUM: 200,
+        SUM: 300,
       },
-    ]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1');
+    ];
+    basicChargeRepositoryMock.getBasicChargePlan.resolves(mockData);
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1');
     expect(result).to.deep.equal([
       {
         'plant-id': 'plant1',
         'unit-id': 'unit1',
-        'fiscal-year': 2021,
-        'operation-input': null,
+        'fiscal-year': 0,
+        'operation-input': 100,
         'maintenance-input': 200,
-        sum: 200,
+        sum: 300,
       },
     ]);
   });
 
-  it('should handle undefined maintenance input', async () => {
-    basicChargeRepositoryMock.getBasicChargePlan.resolves([
+  it('should handle large fiscal year', async () => {
+    const mockData = [
       {
         PLANT_CODE: 'plant1',
         UNIT_CODE: 'unit1',
-        FISCAL_YEAR: 2021,
+        FISCAL_YEAR: 9999,
         OPERATION_INPUT: 100,
-        MAINTENANCE_INPUT: undefined,
-        SUM: 100,
+        MAINTENANCE_INPUT: 200,
+        SUM: 300,
       },
-    ]);
-    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtx, 'plant1');
+    ];
+    basicChargeRepositoryMock.getBasicChargePlan.resolves(mockData);
+    const result = await getBasicChargePlanUsecase(basicChargeRepositoryMock, workUnitCtxMock, 'plant1');
     expect(result).to.deep.equal([
       {
         'plant-id': 'plant1',
         'unit-id': 'unit1',
-        'fiscal-year': 2021,
+        'fiscal-year': 9999,
         'operation-input': 100,
-        'maintenance-input': null,
-        sum: 100,
+        'maintenance-input': 200,
+        sum: 300,
       },
     ]);
   });

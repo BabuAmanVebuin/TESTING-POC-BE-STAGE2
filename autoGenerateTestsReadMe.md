@@ -2,18 +2,19 @@
 
 ## Overview
 
-This script automates the process of generating **unit tests** and **integration tests** for a Node.js TypeScript project. It detects controllers, maps them to their corresponding use cases and repositories, and then generates Jest-based test cases using OpenAI's GPT-4o model.
+This script automates the creation of **integration tests** (using **Mocha**, **Chai**, and **Supertest**) and **unit tests** (using **Mocha** and **Chai**) for a Node.js TypeScript project. It scans project directories for controllers, maps them to their corresponding use cases and repositories, and then uses **OpenAI’s GPT-4o** model to generate the test files. It also ensures database state management using **Sequelize transactions** in integration tests.
 
 ## Features
 
-- **Automated Detection**: Scans the project directories to detect controllers, use cases, and repositories.
-- **Integration & Unit Tests**: Generates both integration and unit tests separately.
-- **Jest Framework**: Ensures all tests are written using Jest.
-- **Error Handling with fp-ts/Either**: Implements error handling patterns for functional programming.
-- **Mocking Repositories**: Uses mocked repositories to isolate dependencies during integration and unit tests.
-- **Edge Case Coverage**: Ensures exhaustive test coverage for both success and failure scenarios.
+- **Automated Detection**: Recursively scans directories to locate controllers, use cases, repositories, DTOs, and routes.
+- **Mocha & Chai**: Uses Mocha as the test runner, and Chai for assertions in both unit and integration tests.
+- **Supertest**: Integration tests leverage Supertest to simulate HTTP requests against the Express app.
+- **Sequelize Transactions**: Manages database state during integration tests using Sequelize transactions.
+- **Comprehensive Coverage**: Generates a minimum of 20 test cases per category (integration and unit), covering both success and failure scenarios for each controller and use case.
 
 ## Directory Structure
+
+Below is a simplified view of how the project might be organized:
 
 ```
 src/
@@ -51,7 +52,7 @@ src/
 │       └── express/
 │           └── index.ts
 ├── interface/
-│   ├── controllers/
+│   └── controllers/
 │   │   ├── createTaskController.ts
 │   │   ├── deleteTaskController.ts
 │   │   ├── findAllTasksController.ts
@@ -66,36 +67,53 @@ src/
 │       ├── index.ts
 │       ├── updateTask.ts
 │       └── util.ts
-│── .env
-│── package.json
-│── autoGenerateTests.ts (this script)
+test/
+└── test4o/
+  ├── integration/
+  ├── unit/
+.env
+package.json
+autoGenerateTests.ts (this script)
 ```
+Within `test/test4o/`, two subdirectories are created automatically during test generation:
+
+- `test/test4o/integration`  
+- `test/test4o/unit`
 
 ## Installation
 
-Ensure you have the required dependencies:
+First, install the required dependencies:
 
 ```sh
-npm install openai dotenv fs path
+npm install openai dotenv fs path mocha chai supertest sequelize
 ```
 
-Also, set up your OpenAI API key in a `.env` file:
+Make sure to include the following in your `.env` file (located in your project’s root directory) for the OpenAI API key:
 
 ```sh
 OPENAI_API_KEY=your_openai_api_key
 ```
 
+> **Note**: You may also need additional Sequelize libraries (e.g., `pg`, `mysql2`, etc.) depending on your chosen database.
+
 ## Script Creation
 
 ### Explanation of the Code
 
-This script is an **automated test generator** for a **Node.js** and **TypeScript** project. It uses **OpenAI’s GPT-4o** model to generate **unit and integration tests** for detected controllers, their corresponding use cases, and repository files.
+This script programmatically:
+
+1. **Loads environment variables** (for OpenAI key, etc.).
+2. **Initializes the OpenAI client** (with GPT-4o).
+3. **Scans** the project’s `controllers` directory for `.ts` files.
+4. **Maps** each controller to a corresponding **use case**, **repository**, **port**, **entity**, and **route** based on a custom configuration.
+5. **Generates prompts** for GPT-4o to create integration and unit tests, using Mocha, Chai, Supertest, and Sequelize transactions where appropriate.
+6. **Writes** the generated tests (as `.test.ts` files) to a `test/test4o/` directory, separated into `integration` and `unit` folders.
 
 ---
 
 ### Step-by-Step Breakdown
 
-### Step 1: Importing Required Modules
+#### Step 1: Importing Required Modules
 
 ```typescript
 import OpenAI from "openai"
@@ -104,24 +122,24 @@ import path from "path"
 import dotenv from "dotenv"
 ```
 
-- **OpenAI**: Used to interact with OpenAI’s API.
-- **fs (File System)**: Helps in reading/writing files.
-- **path**: Manages file and directory paths.
-- **dotenv**: Loads environment variables from a `.env` file.
+- **OpenAI**: Interacts with OpenAI’s GPT-4o model.
+- **fs**: Reads and writes files.
+- **path**: Handles paths across different operating systems.
+- **dotenv**: Loads sensitive environment variables from a `.env` file.
 
 ---
 
-### Step 2: Load Environment Variables
+#### Step 2: Load Environment Variables
 
 ```typescript
 dotenv.config()
 ```
 
-- Loads API keys and other sensitive information from a `.env` file.
+- Loads `.env` configuration to populate environment variables (e.g., your OpenAI API key).
 
 ---
 
-### Step 3: Initialize OpenAI API
+#### Step 3: Initialize OpenAI API
 
 ```typescript
 const openai = new OpenAI({
@@ -129,568 +147,270 @@ const openai = new OpenAI({
 })
 ```
 
-- Initializes OpenAI with the API key stored in the `.env` file.
+- Initializes an instance of OpenAI using the loaded API key.
 
 ---
 
-### Step 4: Define Paths to Different Files
+#### Step 4: Define Paths to Different Files
 
 ```typescript
-const controllersDir = path.join(__dirname, "./src/interface/controllers/dpm/KPI003")
+const controllersDir = path.join(__dirname, "./src/interface/controllers/dpm")
 const useCasesDir = path.join(__dirname, "./src/application/use_cases/dpm")
 const repositoriesDir = path.join(__dirname, "./src/infrastructure/repositories/dpm")
-const portDir = path.join(__dirname, "./src/application/port/repositories")
+const portDir = path.join(__dirname, "./src/application/port")
 const entityDir = path.join(__dirname, "./src/infrastructure/orm/typeorm/entities")
-const dtoDir = path.join(__dirname, "./src/domain/models")
-const routeDir = path.join(__dirname, "./src/infrastructure/webserver/express")
+const dtoDir = path.join(__dirname, "./src/domain")
+const routeDir = path.join(__dirname, "./src")
 ```
 
-- Defines paths for **controllers, use cases, port, repositories, entities, DTOs, and routes** within the project.
+- Identifies the key folders for **controllers**, **use cases**, **repositories**, **ports**, **entities**, **DTOs**, and **routes**.
 
 ---
 
-### Step 5: Define Test Output Directory
+#### Step 5: Define Test Output Directory
 
 ```typescript
 const testOutputDir = path.join(__dirname, "./test/test4o")
 ```
 
-- Specifies where generated test files will be saved.
+- Sets up the output folder where generated test files will be stored.
 
 ---
 
-### Step 6: Ensure Test Directory Exists
+#### Step 6: Ensure Test Directory Exists
 
 ```typescript
 fs.mkdirSync(testOutputDir, { recursive: true })
 ```
 
-- Creates the test output directory if it doesn't already exist.
+- Creates `./test/test4o` if it doesn’t already exist.
 
 ---
 
-### Step 7: Recursively Get All TypeScript Files
+#### Step 7: Recursively Get All TypeScript Files
 
 ```typescript
-const getAllTsFiles = (dir: string): string[] => {
-  let files: string[] = []
-  fs.readdirSync(dir, { withFileTypes: true }).forEach((entry) => {
-    const fullPath = path.join(dir, entry.name)
-    if (entry.isDirectory()) {
-      files = files.concat(getAllTsFiles(fullPath))
-    } else if (entry.name.endsWith(".ts")) {
-      files.push(fullPath)
-    }
-  })
-  return files
-}
+const getAllTsFiles = (dir: string): string[] => { ... }
 ```
 
-- Scans the given directory and **recursively** collects all `.ts` (TypeScript) files.
+- Recursively searches a directory for `.ts` files, accumulating them into an array.
 
 ---
 
-### Step 8: Detect Controller Files
+#### Step 8: Detect Controller Files
 
 ```typescript
 const detectedControllers = getAllTsFiles(controllersDir)
 ```
 
-- Calls the function to get all **controller** files.
+- Collects all `.ts` files from the `controllersDir` directory.
 
 ---
 
-### Step 9: Define the mapping between use cases and their corresponding files (repository, port, entity, dto, route)
+#### Step 9: Define the Mapping Between Use Cases and Their Corresponding Files
 
 ```typescript
-function getFileMapping(): Record<
-  string,
-  { repo: string[]; port: string[]; entity: string[]; dto: string; route: string }
-> {
+function getFileMapping(): Record<string, {...}> {
   return {
-    getBasicChargePlanSummaryController: {
+    getBasicChargePlan: {
+      apiPath: "GET /basic-charge/plan",
+      repoName: "getBasicChargePlan",
+      useCase: "getBasicChargePlanUsecase.ts",
       repo: ["BasicChargeRepositorySequelizeMySQL.ts"],
       port: ["BasicChargeRepositoryPort.ts"],
-      entity: ["BasicCharge.ts"],
-      dto: "BasicChargeDto.ts",
-      route: "basicChargeRoutes.ts",
+      entity: [],
+      dto: "entities/dpm/basicChargePlan.ts",
+      route: "infrastructure/webserver/express/basicChargeRoutes.ts",
     },
-    // Define mappings for other use cases...
+    ...
   }
 }
 ```
 
-- Returns a **mapping** that links **use case methods** to their respective **repository files**.
+- Creates a configuration object mapping a **controller base name** to its **API path**, **repository name**, **use case filename**, **repository** files, **port**, **entity**, **DTO**, and **route**.
 
 ---
 
-### Step 10: Generate the list of test files corresponding to the detected controllers
+#### Step 10: Generate the List of Test Files Corresponding to Detected Controllers
 
 ```typescript
 const detectedTestFiles = detectedControllers.map((controllerPath) => {
-  const controllerFile = path.relative(controllersDir, controllerPath)
-  const baseName = path.basename(controllerFile, ".ts").replace("Controller", "")
-
-  const useCaseFile = path.join(path.dirname(controllerFile), `${baseName}UseCase.ts`)
-  const useCasePath = useCaseFile ? path.join(useCasesDir, useCaseFile) : ""
-
-  const files = fileMap[baseName] || {
-    repo: [],
-    port: [],
-    entity: [],
-    dto: "",
-    route: "",
-  }
-
-  const repoPath = files.repo.map((repo) => path.join(repositoriesDir, repo))
-  const portPath = files.port.map((port) => path.join(portDir, port))
-  const entityPath = files.entity.map((entity) => path.join(entityDir, entity))
-  const dtoPath = files.dto ? path.join(dtoDir, files.dto) : ""
-  const routePath = files.route ? path.join(routeDir, files.route) : ""
-
-  const useCaseExists = fs.existsSync(useCasePath)
-  const repoExists = repoPath && repoPath.every((repo) => fs.existsSync(repo))
-  const portExists = portPath && portPath.every((port) => fs.existsSync(port))
-  const entityExists = entityPath && entityPath.every((entity) => fs.existsSync(entity))
-  const dtoExists = dtoPath && fs.existsSync(dtoPath)
-  const routeExists = routePath && fs.existsSync(routePath)
-
-  console.log(`📝 Checking: ${baseName}`)
-  console.log(`  🔹 Controller: ${controllerFile}`)
-  console.log(`  🔹 Use Case: ${useCaseFile} → Exists? ${useCaseExists}`)
-  console.log(`  🔹 Repository: ${files.repo || "N/A"} → Exists? ${repoExists}`)
-  console.log(`  🔹 Port: ${files.port || "N/A"} → Exists? ${portExists}`)
-  console.log(`  🔹 Entity: ${files.entity || "N/A"} → Exists? ${entityExists}`)
-  console.log(`  🔹 DTO: ${files.dto || "N/A"} → Exists? ${dtoExists}`)
-  console.log(`  🔹 Route: ${files.route || "N/A"} → Exists? ${routeExists}`)
-
+  // derive base name, locate mapping, check file existence, etc.
   return {
     name: `${baseName}.test.ts`,
+    apiPath: files.apiPath,
     controller: controllerFile,
-    useCase: useCaseExists ? useCaseFile : null,
-    repo: repoExists ? files.repo : null,
-    port: portExists ? files.port : null,
-    entity: entityExists ? files.entity : null,
-    dto: dtoExists ? files.dto : null,
-    route: routeExists ? files.route : null,
+    useCase: useCaseExists ? files.useCase : null,
+    ...
   }
 })
 ```
 
-- Get file mappings for the base controller name.
-- Map the repository, port, entity, dto, and route paths.
-- Check if the required files exist.
-- Logs the results of the check.
+- Determines which files exist for each controller (use case, repo, port, entity, etc.).
+- Logs out the status.
 
 ---
 
-### Step 11: Read File Content
+#### Step 11: Read File Content Safely
 
 ```typescript
-const readFileContent = (filePath: string): string | null => {
-  try {
-    return fs.readFileSync(filePath, "utf-8")
-  } catch (error) {
-    console.warn(`⚠️ Warning: File not found - ${filePath}`)
-    return null
-  }
-}
+const readFileContent = (filePath: string): string | null => { ... }
 ```
 
-- Reads the content of a file and returns it as a string.
-- Returns `null` & log the warning if the file is not found.
+- Attempts to read the content of a file.
+- Returns `null` with a warning if the file doesn’t exist.
 
 ---
 
-## Step 12: Function to generate the test cases by sending the prompt to OpenAI API
+#### Step 12: Function to Generate the Test Cases by Sending the Prompt to OpenAI API
 
 ```typescript
 async function generateTest(
   fileName: string,
-  controllerFile: string,
-  useCaseFile: string | null,
-  repositoryFile: string[] | null,
-  portFile: string[] | null,
-  entityFile: string[] | null,
-  dtoFile: string | null,
-  routeFile: string | null,
+  apiPath: string,
+  ...
 ) {
-  const controllerPath = path.join(controllersDir, controllerFile)
-  const useCasePath = useCaseFile ? path.join(useCasesDir, useCaseFile) : null
-  const repositoryPath = repositoryFile?.map((repo) => path.join(repositoriesDir, repo))
-  const portPath = portFile?.map((port) => path.join(portDir, port))
-  const entityPath = entityFile?.map((entity) => path.join(entityDir, entity))
-  const dtoPath = dtoFile ? path.join(dtoDir, dtoFile) : null
-  const routePath = routeFile ? path.join(routeDir, routeFile) : null
-
-  const controllerCode = readFileContent(controllerPath)
-  const useCaseCode = useCasePath ? readFileContent(useCasePath) : null
-  const repositoryCode = repositoryPath?.map(readFileContent)
-  const portCode = portPath?.map(readFileContent)
-  const entityCode = entityPath?.map(readFileContent)
-  const dtoCode = dtoPath ? readFileContent(dtoPath) : null
-  const routeCode = routePath ? readFileContent(routePath) : null
-
-  if (!controllerCode || !useCaseCode) {
-    console.error(`❌ Skipping test generation for ${fileName} due to missing files.`)
+  // ...
+  if (!controllerCode || !useCaseCode || !repositoryCode || !routeCode) {
+    console.error(`❌ Skipping test generation...`)
     return
   }
+  // ...
+}
 ```
 
-### Explanation
-
-- This function **reads the content** of a given TypeScript file.
-- Resolving File Paths.
-- Validating Required Files.
+- Orchestrates reading the relevant files (controller, use case, repository, etc.) and checking for presence.
+- Prepares the final test prompts for the **integration** and **unit** tests.
 
 ---
 
-## Step 13: Creating an Integration Test Prompt
+#### Step 13: Creating an Integration Test Prompt
 
 ```typescript
 const integrationPrompt = `
-      STRICTLY FOLLOW THE INSTRUCTIONS BELOW WITHOUT EXCEPTION:
-
-      Given the following TypeScript files:
-
-      **Controller:**
-      \`\`\`typescript
-      ${controllerCode}
-      \`\`\`
-
-      **Use Case:**
-      \`\`\`typescript
-      ${useCaseCode}
-      \`\`\`
-
-      **Repository:**
-      \`\`\`typescript
-      ${repositoryCode}
-      \`\`\`
-
-      **Port:**
-      \`\`\`typescript
-      ${portCode}
-      \`\`\`
-
-      **Entity:**
-      \`\`\`typescript
-      ${entityCode}
-      \`\`\`
-
-      **DTO:**
-      \`\`\`typescript
-      ${dtoCode}
-      \`\`\`
-
-      **Route:**
-      \`\`\`typescript
-      ${routeCode}
-      \`\`\`
-
-      YOU MUST GENERATE a **Complete and exhaustive integration API test consisting of a minimum of 20 test cases, focusing on the full API flow from beginning to end** in TypeScript.
-
-      **MANDATORY REQUIREMENTS (DO NOT IGNORE ANY):**
-      - The test **MUST** be written using **Jest** as the testing framework.
-      - The test **MUST** use **fp-ts/Either** for handling errors.
-      - The test **MUST** use **fp-ts/Option** for handling optional values.
-      - **ALL POSSIBLE CASES, including both SUCCESS and FAILURE scenarios, MUST be covered completely.**
-      - **DO NOT SKIP ANY CONTENTS OR EDGE CASES.**
-      - **DO NOT wrap the output inside code blocks like \`\`\`typescript**.
-      - **The output MUST ONLY contain valid TypeScript Jest test code—NO COMMENTS, NO EXPLANATIONS, NO EXTRA TEXT.**
-      - **FAILURE TO FOLLOW THESE INSTRUCTIONS WILL BE CONSIDERED AN ERROR.**
-
-      **ADDITIONAL MANDATORY FIXES TO AVOID COMMON ERRORS:**
-      1. **Fix 'Cannot find module' errors by enforcing correct relative imports:**
-         - The test file **MUST** use '../../../src/...' instead of '@src/'.
-         - Example:
-           ✅ **Correct:**
-           \`import { getPaymentRecordByIdNameUseCase } from '../../../src/application/use_cases/paymentRecord/getPaymentRecordByIdNameUseCase';\`  
-           ❌ **Incorrect:**
-           \`import { getPaymentRecordByIdNameUseCase } from '@src/application/use_cases/paymentRecord/getPaymentRecordByIdNameUseCase';\`
-
-      2. **Ensure Jest resolves paths properly:**
-         - The test **MUST** import modules using '../../../src/...' to match the actual project structure.
-         - The test **MUST NOT** use Jest's 'moduleNameMapper'.
-
-      3. **Fix 'right' does not exist error in fp-ts/Either:**
-         - The test **MUST NOT** use 'result.right'. Instead, it **MUST** use 'E.getOrElse()' to extract values:
-           - ✅ **Correct:**
-             \'const paymentRecord = E.getOrElse<ApplicationError, PaymentRecordDto>(
-                () => { throw new Error("Expected Right but got Left"); }
-             )(result);\'
-           - ❌ **Incorrect:**
-             \'const paymentRecord = result.right;\'
-
-      4. **Ensure Jest mocks dependencies correctly:**
-         - The test **MUST** properly mock repository methods using Jest.
-         - Example:
-           \'jest.mock('../../../src/infrastructure/repositories/paymentRecordRepositoryMySQL');\'
-         - This ensures Jest correctly isolates repository logic.
-           '''
-
-      **Final Note:**
-      - The generated test file **MUST** run successfully in a TypeScript project using Jest.
-      - **STRICTLY FOLLOW THESE INSTRUCTIONS OR THE OUTPUT WILL BE CONSIDERED INCORRECT.**
-
-      NOW, GENERATE THE TEST.
-    `
+  STRICTLY FOLLOW THE INSTRUCTIONS BELOW...
+  YOU MUST GENERATE a complete and exhaustive integration API test...
+  - Test MUST be written using Mocha, Chai, and Supertest
+  - Use Sequelize transactions...
+  ...
+`
 ```
 
-### Explanation
-
-- The prompt is **strictly structured** to ensure that OpenAI follows **Jest** and **fp-ts/Either** patterns.
-- It **provides the files code** so OpenAI can generate relevant tests.
-- **It enforces complete coverage**, including **success and failure scenarios**.
-- The output is **pure TypeScript code**, with **no comments or extra text** to keep it clean.
+- Assembles a tightly controlled prompt instructing GPT-4o to produce **Mocha/Chai/Supertest** integration tests.
+- Emphasizes correct relative imports, success & failure cases, etc.
 
 ---
 
-## Step 14: Sending API Requests to OpenAI for Integration Test
+#### Step 14: Sending API Requests to OpenAI for Integration Test
 
 ```typescript
 const integrationResponse = await openai.chat.completions.create({
   model: "gpt-4o",
   messages: [{ role: "developer", content: integrationPrompt }],
-  max_tokens: 4000,
-  temperature: 0.0,
-  top_p: 0.0,
-  frequency_penalty: 0,
-  presence_penalty: 0,
+  ...
 })
 ```
 
-### Explanation
-
-- This sends the **integration test prompt** to OpenAI’s **GPT-4o** model.
-- The model is instructed to **return only valid TypeScript Jest code**.
-- **max_tokens: 4000** ensures the response is long enough to cover all scenarios.
+- Calls the GPT-4o model to produce an integration test file.
 
 ---
 
-## Step 15: Saving the Generated Integration Test
+#### Step 15: Saving the Generated Integration Test
 
 ```typescript
 if (integrationResponse?.choices?.[0]?.message?.content) {
-      const filePath = path.join(testOutputDir, "integration", fileName)
-      fs.mkdirSync(path.dirname(filePath), { recursive: true })
-      fs.writeFileSync(filePath, integrationResponse.choices[0].message.content.trim(), { encoding: "utf8" })
-      console.log(`✅ Generated Integration Test: ${filePath}`)
-    }
-  } catch (error) {
-    console.error(`❌ Error generating tests for ${fileName}:`, error)
-  }
+  fs.writeFileSync(filePath, integrationResponse.choices[0].message.content.trim())
+  console.log(`✅ Generated Integration Test: ${filePath}`)
+}
 ```
 
-### Explanation
-
-- **Checks if OpenAI returned a valid response**.
-- Constructs the **file path** for the integration test.
-- **Creates the directory if it doesn't exist**.
-- **Writes the generated test to a file**.
+- Creates any necessary directories.
+- Writes the generated integration test code to a new `.test.ts` file.
 
 ---
 
-## Step 16: Creating a Unit Test Prompt
+#### Step 16: Creating a Unit Test Prompt
 
 ```typescript
 const unitPrompt = `
-    STRICTLY FOLLOW THE INSTRUCTIONS BELOW WITHOUT EXCEPTION:
-
-    Given the following TypeScript files:
-
-    **Controller:**
-    \`\`\`typescript
-    ${controllerCode}
-    \`\`\`
-
-    **Use Case:**
-    \`\`\`typescript
-    ${useCaseCode}
-    \`\`\`
-
-    **Repository:**
-    \`\`\`typescript
-    ${repositoryCode}
-    \`\`\`
-
-    **Port:**
-    \`\`\`typescript
-    ${portCode}
-    \`\`\`
-
-    **Entity:**
-    \`\`\`typescript
-    ${entityCode}
-    \`\`\`
-
-    **DTO:**
-    \`\`\`typescript
-    ${dtoCode}
-    \`\`\`
-
-    **Route:**
-    \`\`\`typescript
-    ${routeCode}
-    \`\`\`
-
-    YOU MUST GENERATE a **Complete and exhaustive unit test consisting of a minimum of 20 test cases, focusing only on the Use Case file.** in TypeScript.
-
-    **MANDATORY REQUIREMENTS (DO NOT IGNORE ANY):**
-    - The test **MUST** be written using **Jest** as the testing framework.
-    - The test **MUST** use **fp-ts/Either** for handling errors.
-    - The test **MUST** use **fp-ts/Option** for handling optional values.
-    - **The Repository MUST be properly mocked** to isolate dependencies.
-    - **ALL POSSIBLE CASES, including both SUCCESS and FAILURE scenarios, MUST be covered completely.**
-    - **DO NOT SKIP ANY CONTENTS OR EDGE CASES.**
-    - **DO NOT wrap the output inside code blocks like \`\`\`typescript**.
-    - **The output MUST ONLY contain valid TypeScript Jest test code—NO COMMENTS, NO EXPLANATIONS, NO EXTRA TEXT.**
-    - **FAILURE TO FOLLOW THESE INSTRUCTIONS WILL BE CONSIDERED AN ERROR.**
-
-    **ADDITIONAL MANDATORY FIXES TO AVOID COMMON ERRORS:**
-    1. **Fix 'Cannot find module' errors by enforcing correct relative imports:**
-        - The test file **MUST** use '../../../src/...' instead of '@src/'.
-        - Example:
-        ✅ **Correct:**
-        \`import { getPaymentRecordByIdNameUseCase } from '../../../src/application/use_cases/paymentRecord/getPaymentRecordByIdNameUseCase';\`  
-        ❌ **Incorrect:**
-        \`import { getPaymentRecordByIdNameUseCase } from '@src/application/use_cases/paymentRecord/getPaymentRecordByIdNameUseCase';\`
-
-    2. **Ensure Jest resolves paths properly:**
-        - The test **MUST** import modules using '../../../src/...' to match the actual project structure.
-        - The test **MUST NOT** use Jest's 'moduleNameMapper'.
-
-    3. **Fix 'right' does not exist error in fp-ts/Either:**
-        - The test **MUST NOT** use 'result.right'. Instead, it **MUST** use 'E.getOrElse()' to extract values:
-        - ✅ **Correct:**
-            \'const paymentRecord = E.getOrElse<ApplicationError, PaymentRecordDto>(
-                () => { throw new Error("Expected Right but got Left"); }
-            )(result);\'
-        - ❌ **Incorrect:**
-            \'const paymentRecord = result.right;\'
-
-    4. **Ensure Jest mocks dependencies correctly:**
-        - The test **MUST** properly mock repository methods using Jest.
-        - Example:
-        \'jest.mock('../../../src/infrastructure/repositories/paymentRecordRepositoryMySQL');\'
-        - This ensures Jest correctly isolates repository logic.
-        '''
-
-    **Final Note:**
-    - The generated test file **MUST** run successfully in a TypeScript project using Jest.
-    - **STRICTLY FOLLOW THESE INSTRUCTIONS OR THE OUTPUT WILL BE CONSIDERED INCORRECT.**
-
-    NOW, GENERATE THE TEST.
-    `
+STRICTLY FOLLOW THE INSTRUCTIONS BELOW...
+YOU MUST GENERATE a complete and exhaustive set of unit tests...
+- Test MUST be written using Mocha, Chai
+- Must mock external dependencies...
+`
 ```
 
-### Explanation
-
-- This prompt is similar to the **integration test prompt**, but it focuses on **unit testing**.
-- The tests must **fully cover success and failure scenarios**.
+- Instructs GPT-4o to produce a unit test suite for the target **use case** only.
 
 ---
 
-## Step 17: Sending API Requests to OpenAI for Unit Test
+#### Step 17: Sending API Requests to OpenAI for Unit Test
 
 ```typescript
 const unitResponse = await openai.chat.completions.create({
   model: "gpt-4o",
   messages: [{ role: "developer", content: unitPrompt }],
-  max_tokens: 14000,
-  temperature: 0.0,
-  top_p: 0.0,
-  frequency_penalty: 0,
-  presence_penalty: 0,
+  ...
 })
 ```
 
-### Explanation
-
-- This sends the **unit test prompt** to OpenAI’s **GPT-4o** model.
-- The model is instructed to **return only valid TypeScript Jest code**.
-- **max_tokens: 4000** ensures the response is long enough to cover all scenarios.
+- Requests the GPT-4o model to generate the unit test code.
 
 ---
 
-## Step 18: Saving the Generated Unit Test
+#### Step 18: Saving the Generated Unit Test
 
 ```typescript
 if (unitResponse?.choices?.[0]?.message?.content) {
-      const unitFilePath = path.join(testOutputDir, "unit", fileName)
-      fs.mkdirSync(path.dirname(unitFilePath), { recursive: true })
-      fs.writeFileSync(unitFilePath, unitResponse.choices[0].message.content.trim(), { encoding: "utf8" })
-      console.log(`✅ Generated Unit Test: ${unitFilePath}`)
-    }
-  } catch (error) {
-    console.error(`❌ Error generating tests for ${fileName}:`, error)
-  }
+  fs.writeFileSync(unitFilePath, unitResponse.choices[0].message.content.trim())
+  console.log(`✅ Generated Unit Test: ${unitFilePath}`)
 }
 ```
 
-### Explanation
-
-- **Checks if OpenAI returned a valid response**.
-- Constructs the **file path** for the unit test.
-- **Creates the directory if it doesn't exist**.
-- **Writes the generated test to a file**.
-
-### Step 19: Generate All Tests
-
-```typescript
-async function generateAllTests() {
-  for (const { name, controller, useCase, repo, port, entity, dto, route } of detectedTestFiles) {
-    console.log(`Generating test for: ${name}`)
-    console.log(`  Controller: ${controller}`)
-    console.log(`  Use Case: ${useCase}`)
-    console.log(`  Repository: ${repo}`)
-    console.log(`  Port: ${port}`)
-    console.log(`  Entity: ${entity}`)
-    console.log(`  DTO: ${dto}`)
-    console.log(`  Route: ${route}`)
-    await generateTest(
-      name,
-      controller,
-      useCase || null,
-      repo || null,
-      port || null,
-      entity || null,
-      dto || null,
-      route || null,
-    )
-  }
-}
-```
-
-- Iterates over detected test files and generates tests for each.
+- Writes the generated unit test suite to a `.test.ts` file in `test/test4o/unit/`.
 
 ---
 
-### Step 20: Start Test Generation
+#### Step 19: Generate All Tests
+
+```typescript
+async function generateAllTests() {
+  for (const { name, apiPath, controller, useCase, ... } of detectedTestFiles) {
+    await generateTest(name, apiPath, controller, useCase, ...)
+  }
+}
+```
+
+- Iterates over each discovered controller file, triggering generation of both **integration** and **unit** tests.
+
+---
+
+#### Step 20: Start Test Generation
 
 ```typescript
 generateAllTests()
 ```
 
-- **Runs the entire process**, automatically generating tests.
+- Kicks off the entire process, producing tests for all found controllers and use cases.
 
 ## Running the Script
 
-To execute the test generation process, run:
+To run the entire test generation flow, simply execute:
 
 ```sh
-yarn test:generate
+npx ts-node path/to/your/script.js
 ```
 
-OR
+Or, if you’ve set up a script in your `package.json`, something like:
 
 ```sh
-npm test:generate
+npm run test:generate
 ```
 
-This will generate test files automatically and store them in the `test/test4o/` directory.
+This will generate Mocha/Chai/Supertest integration tests (with Sequelize transactions) and Mocha/Chai unit tests for each detected controller and use case under the `test/test4o` folder.
 
 ## Note
 
-- Please review the generated testcases for correctness and completeness.
-- If any issues are found, adjust the test generation process accordingly.
+- Review and refine the generated test files as needed, especially if your project requires additional configuration for Sequelize, Mocha, Chai, or custom logic in your test environment.
+- Make sure your environment supports TypeScript test execution (you may need [ts-node](https://www.npmjs.com/package/ts-node) or a similar setup).
+- If the script doesn’t generate tests for a specific file (due to missing references or an incomplete mapping), update the **file mapping** in the script to ensure each controller is properly associated with its dependencies.
