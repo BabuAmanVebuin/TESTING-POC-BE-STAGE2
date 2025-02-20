@@ -18,8 +18,8 @@ const useCasesDir = path.join(__dirname, "./src/application/use_cases/dpm")
 const repositoriesDir = path.join(__dirname, "./src/infrastructure/repositories/dpm")
 const portDir = path.join(__dirname, "./src/application/port")
 const entityDir = path.join(__dirname, "./src/infrastructure/orm/typeorm/entities")
-const dtoDir = path.join(__dirname, "./src/domain/entities/dpm")
-const routeDir = path.join(__dirname, "./src/infrastructure/webserver/express")
+const dtoDir = path.join(__dirname, "./src/domain")
+const routeDir = path.join(__dirname, "./src")
 // Step 5: Define Test Output Directory
 const testOutputDir = path.join(__dirname, "./test/test4o")
 // Step 6: Ensure Test Directory Exists
@@ -42,7 +42,7 @@ const getAllTsFiles = (dir: string): string[] => {
 // Step 8: Detect Controller Files
 const detectedControllers = getAllTsFiles(controllersDir)
 
-// Step 9: Define the mapping between use cases and their corresponding files (repository, port, entity, dto, route)
+// Step 9: Define the mapping between use cases and their corresponding files
 function getFileMapping(): Record<
   string,
   { apiPath: string; repoName: string; useCase: string; repo: string[]; port: string[]; entity: string[]; dto: string; route: string }
@@ -55,8 +55,8 @@ function getFileMapping(): Record<
       repo: ["BasicChargeRepositorySequelizeMySQL.ts"],
       port: ["BasicChargeRepositoryPort.ts"],
       entity: [],
-      dto: "basicChargePlan.ts",
-      route: "basicChargeRoutes.ts",
+      dto: "entities/dpm/basicChargePlan.ts",
+      route: "infrastructure/webserver/express/basicChargeRoutes.ts",
     },
     upsertBasicChargePlan: {
       apiPath: "PUT /basic-charge/plan",
@@ -65,8 +65,8 @@ function getFileMapping(): Record<
       repo: ["BasicChargeRepositorySequelizeMySQL.ts"],
       port: ["BasicChargeRepositoryPort.ts"],
       entity: [],
-      dto: "basicChargePlan.ts",
-      route: "basicChargeRoutes.ts",
+      dto: "entities/dpm/basicChargePlan.ts",
+      route: "infrastructure/webserver/express/basicChargeRoutes.ts",
     },
     getBasicChargePlanSummary: {
       apiPath: "GET /basic-charge/plan/summary",
@@ -75,8 +75,18 @@ function getFileMapping(): Record<
       repo: ["BasicChargeRepositorySequelizeMySQL.ts"],
       port: ["BasicChargeRepositoryPort.ts"],
       entity: [],
-      dto: "basicChargePlanSummary.ts",
-      route: "basicChargeRoutes.ts",
+      dto: "entities/dpm/basicChargePlanSummary.ts",
+      route: "infrastructure/webserver/express/basicChargeRoutes.ts",
+    },
+    getBasicCharge: {
+      apiPath: "GET /basic-charge",
+      repoName: "getBasicCharge",
+      useCase: "generateBasicChargeResponseUseCase.ts",
+      repo: ["snowflake/basicChargeRepositorySnowflake.ts"],
+      port: ["BasicChargeRepositoryPort.ts"],
+      entity: [],
+      dto: "models/dpm/KPI003/Index.ts",
+      route: "interface/routes/dpm/getBasicCharge.ts",
     },
     // Define mappings for other use cases...
   }
@@ -276,6 +286,44 @@ async function generateTest(
    \`\`\`
    - DO NOT use alternative app setup methods. Ensure this structure is maintained for all tests.
 
+  6. Strict Instructions Sometimes Don’t Work
+    - All instructions given here are mandatory.
+    - If any instruction conflicts, the stricter or more specific rule must be followed.
+
+  7. Type-Related Issues
+    - Avoid sprinkling any types.
+    - If code can infer or define more specific types, use them (e.g., interface, type).
+
+  8. Avoid Creating Unnecessary Empty Objects
+    - Avoid creating unnecessary empty objects.
+    - Do not send empty payloads or objects unless you are explicitly testing a scenario that requires them.
+
+  9. Don’t Use Error.message
+    - Avoid using Error.message in tests.
+    - Use Chai assertions instead (e.g., expect(error).to.equal('expected value') or expect(error).to.deep.equal(expected)).
+
+  10. Avoid Sending Incorrect Payloads (Unless Testing Error Cases)
+    - Only send invalid payloads if you are testing a negative scenario.
+    - For success scenarios, use valid input that matches all required columns.
+
+  11. Using the Correct ORM
+    - If the code uses Sequelize, do not generate TypeORM code.
+    - If it’s TypeORM, do not use Sequelize or mix references.
+
+  12. Use Necessary Columns When Inserting Data
+    - If inserting data, ensure the payload contains all necessary columns.
+
+  13. Use Correct Chai Expectations
+    - For example, expect(value).to.equal(...) or expect(value).to.deep.equal(...).
+    - Avoid incorrect syntax like expect.to(...).
+
+  14. Limit Use of any
+    - The test code must define or infer types whenever possible.
+
+  15. Avoid Flaky Tests
+    - Do not rely on timing delays or unpredictable external services.
+    - Keep tests deterministic and stable.
+
   Final Note:
   - The generated test file MUST run successfully in a TypeScript project using Mocha, Chai, and Sequelize.
   - STRICTLY FOLLOW THESE INSTRUCTIONS OR THE OUTPUT WILL BE CONSIDERED INCORRECT.
@@ -371,6 +419,44 @@ ADDITIONAL MANDATORY FIXES TO AVOID COMMON ERRORS:
 5. Ensure proper test structure:
    - The test MUST contain setup (e.g., mocks), action (e.g., calling the use case method), and assertion (e.g., checking results).
    - Ensure that each test case is self-contained, and proper mocks are restored after tests to prevent side effects.
+
+6. Strict Instructions Sometimes Don’t Work
+   - All instructions given here are mandatory.
+   - If any instruction conflicts, the stricter or more specific rule must be followed.
+
+7. Type-Related Issues
+   - Avoid sprinkling any types.
+   - If code can infer or define more specific types, use them (e.g., interface, type).
+
+8. Avoid Creating Unnecessary Empty Objects
+   - Avoid creating unnecessary empty objects.
+   - Do not send empty payloads or objects unless you are explicitly testing a scenario that requires them.
+
+9. Don’t Use Error.message
+   - Avoid using Error.message in tests.
+   - Use Chai assertions instead (e.g., expect(error).to.equal('expected value') or expect(error).to.deep.equal(expected)).
+
+10. Avoid Sending Incorrect Payloads (Unless Testing Error Cases)
+   - Only send invalid payloads if you are testing a negative scenario.
+   - For success scenarios, use valid input that matches all required columns.
+
+11. Using the Correct ORM
+   - If the code uses Sequelize, do not generate TypeORM code.
+   - If it’s TypeORM, do not use Sequelize or mix references.
+
+12. Use Necessary Columns When Inserting Data
+   - If inserting data, ensure the payload contains all necessary columns.
+
+13. Use Correct Chai Expectations
+   - For example, expect(value).to.equal(...) or expect(value).to.deep.equal(...).
+   - Avoid incorrect syntax like expect.to(...).
+
+14. Limit Use of any
+   - The test code must define or infer types whenever possible.
+
+15. Avoid Flaky Tests
+   - Do not rely on timing delays or unpredictable external services.
+   - Keep tests deterministic and stable.
 
 Final Note:
 - The generated test file MUST run successfully in a TypeScript project using Mocha, Chai.
