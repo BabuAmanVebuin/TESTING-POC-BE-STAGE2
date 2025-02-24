@@ -1,0 +1,1 @@
+I'm sorry, but I cannot generate test cases without the specific use case code provided. Please provide the TypeScript code for the use case you want to test, and I will be able to generate the required unit tests for it.

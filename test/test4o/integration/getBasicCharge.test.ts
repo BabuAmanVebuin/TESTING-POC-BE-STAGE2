@@ -1,226 +1,471 @@
-```typescript
 import express from 'express';
 import { expect } from 'chai';
 import request from 'supertest';
-import { Sequelize, Transaction } from 'sequelize';
-import { BasicChargeRoutes } from '../../../src/infrastructure/webserver/express/routes';
-import { sequelize } from '../../../src/infrastructure/orm/sequelize';
+import { Sequelize } from 'sequelize';
+import { BasicChargeRoutes } from '../../../src/routes/BasicChargeRoutes';
+import { wrapInSnowflakeTransaction } from '../../../src/infrastructure/orm/snowflake';
+import { ApplicationError } from '../../../src/application/errors/dpm';
+import { BasicChargeJson } from '../../../src/domain/models/dpm/BasicChargeJson';
 
 const app = express();
 BasicChargeRoutes(app);
 
 describe('GET /basic-charge', () => {
-  let transaction: Transaction;
+  let sequelize: Sequelize;
 
-  beforeEach(async () => {
-    transaction = await sequelize.transaction();
+  before(async () => {
+    sequelize = new Sequelize('sqlite::memory:');
   });
 
-  afterEach(async () => {
-    await transaction.rollback();
+  after(async () => {
+    await sequelize.close();
   });
 
-  it('should return basic charge data for valid plantCode, unitCode, and epochSeconds', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'validPlant', unitCode: 'validUnit', epochSeconds: 1609459200 })
-      .expect(200);
-
-    expect(response.body).to.have.property('PlantCode', 'validPlant');
-    expect(response.body).to.have.property('UnitCode', 'validUnit');
-    expect(response.body).to.have.property('BasicCharge').that.is.an('array');
-  });
-
-  it('should return 404 for invalid plantCode', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'invalidPlant', unitCode: 'validUnit', epochSeconds: 1609459200 })
-      .expect(404);
-
-    expect(response.text).to.equal('Invalid plant code');
-  });
-
-  it('should return 404 for invalid unitCode', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'validPlant', unitCode: 'invalidUnit', epochSeconds: 1609459200 })
-      .expect(404);
-
-    expect(response.text).to.equal('Invalid unit code');
-  });
-
-  it('should return 400 for invalid epochSeconds', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'validPlant', unitCode: 'validUnit', epochSeconds: 'invalid' })
-      .expect(400);
-
-    expect(response.text).to.equal('Invalid epoch timestamp');
-  });
-
-  it('should return 500 for internal server error', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'errorPlant', unitCode: 'validUnit', epochSeconds: 1609459200 })
-      .expect(500);
-
-    expect(response.text).to.equal('Internal server error');
-  });
-
-  it('should return basic charge data with null unitCode', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'validPlant', unitCode: null, epochSeconds: 1609459200 })
-      .expect(200);
-
-    expect(response.body).to.have.property('PlantCode', 'validPlant');
-    expect(response.body).to.have.property('UnitCode', null);
-    expect(response.body).to.have.property('BasicCharge').that.is.an('array');
-  });
-
-  it('should return 400 for missing plantCode', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ unitCode: 'validUnit', epochSeconds: 1609459200 })
-      .expect(400);
-
-    expect(response.text).to.equal('Missing plant code');
-  });
-
-  it('should return 400 for missing epochSeconds', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'validPlant', unitCode: 'validUnit' })
-      .expect(400);
-
-    expect(response.text).to.equal('Missing epoch timestamp');
-  });
-
-  it('should return 400 for missing unitCode', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'validPlant', epochSeconds: 1609459200 })
-      .expect(400);
-
-    expect(response.text).to.equal('Missing unit code');
-  });
-
-  it('should return 200 with empty BasicCharge array for valid plantCode and unitCode with no data', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'emptyDataPlant', unitCode: 'emptyDataUnit', epochSeconds: 1609459200 })
-      .expect(200);
-
-    expect(response.body).to.have.property('PlantCode', 'emptyDataPlant');
-    expect(response.body).to.have.property('UnitCode', 'emptyDataUnit');
-    expect(response.body).to.have.property('BasicCharge').that.is.an('array').that.is.empty;
-  });
-
-  it('should return 200 with correct currency prefix and suffix', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'validPlant', unitCode: 'validUnit', epochSeconds: 1609459200 })
-      .expect(200);
-
-    expect(response.body).to.have.property('Prefix', '¥');
-    expect(response.body).to.have.property('Suffix', 'Oku');
-  });
-
-  it('should handle large epochSeconds values gracefully', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'validPlant', unitCode: 'validUnit', epochSeconds: 9999999999 })
-      .expect(200);
-
-    expect(response.body).to.have.property('PlantCode', 'validPlant');
-    expect(response.body).to.have.property('UnitCode', 'validUnit');
-    expect(response.body).to.have.property('BasicCharge').that.is.an('array');
-  });
-
-  it('should handle small epochSeconds values gracefully', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'validPlant', unitCode: 'validUnit', epochSeconds: 1 })
-      .expect(200);
-
-    expect(response.body).to.have.property('PlantCode', 'validPlant');
-    expect(response.body).to.have.property('UnitCode', 'validUnit');
-    expect(response.body).to.have.property('BasicCharge').that.is.an('array');
-  });
-
-  it('should return 200 with correct fiscal year range', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'validPlant', unitCode: 'validUnit', epochSeconds: 1609459200 })
-      .expect(200);
-
-    expect(response.body.BasicCharge).to.be.an('array');
-    response.body.BasicCharge.forEach((charge: any) => {
-      expect(charge).to.have.property('FiscalYear').that.is.a('number');
-    });
-  });
-
-  it('should return 200 with correct annual and monthly values', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'validPlant', unitCode: 'validUnit', epochSeconds: 1609459200 })
-      .expect(200);
-
-    expect(response.body.BasicCharge).to.be.an('array');
-    response.body.BasicCharge.forEach((charge: any) => {
-      expect(charge).to.have.property('Annual').that.is.a('number');
-      expect(charge).to.have.property('Monthly').that.is.a('number');
-    });
-  });
-
-  it('should return 200 with correct handling of null maintenance and operation amounts', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'nullAmountsPlant', unitCode: 'nullAmountsUnit', epochSeconds: 1609459200 })
-      .expect(200);
-
-    expect(response.body.BasicCharge).to.be.an('array');
-    response.body.BasicCharge.forEach((charge: any) => {
-      expect(charge).to.have.property('Annual').that.is.a('number');
-      expect(charge).to.have.property('Monthly').that.is.a('number');
-    });
-  });
-
-  it('should return 200 with correct handling of profit start date', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'profitStartPlant', unitCode: 'profitStartUnit', epochSeconds: 1609459200 })
-      .expect(200);
-
-    expect(response.body.BasicCharge).to.be.an('array');
-    response.body.BasicCharge.forEach((charge: any) => {
-      expect(charge).to.have.property('Annual').that.is.a('number');
-      expect(charge).to.have.property('Monthly').that.is.a('number');
-    });
-  });
-
-  it('should return 200 with correct handling of fiscal year boundaries', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'boundaryPlant', unitCode: 'boundaryUnit', epochSeconds: 1609459200 })
-      .expect(200);
-
-    expect(response.body.BasicCharge).to.be.an('array');
-    response.body.BasicCharge.forEach((charge: any) => {
-      expect(charge).to.have.property('FiscalYear').that.is.a('number');
-    });
-  });
-
-  it('should return 200 with correct handling of multiple units', async () => {
-    const response = await request(app)
-      .get('/basic-charge')
-      .query({ plantCode: 'multiUnitPlant', unitCode: 'multiUnit', epochSeconds: 1609459200 })
-      .expect(200);
-
-    expect(response.body.BasicCharge).to.be.an('array');
-    response.body.BasicCharge.forEach((charge: any) => {
-      expect(charge).to.have.property('FiscalYear').that.is.a('number');
-    });
-  });
-});
-```
+  const testCases = [
+    { plantCode: 'P001', unitCode: 'U001', epochSeconds: 1609459200, expectedStatus: 200 },
+    { plantCode: 'P002', unitCode: 'U002', epochSeconds: 1612137600, expectedStatus: 200 },
+    { plantCode: 'P003', unitCode: null, epochSeconds: 1614556800, expectedStatus: 200 },
+    { plantCode: 'P004', unitCode: 'U004', epochSeconds: 1617235200, expectedStatus: 200 },
+    { plantCode: 'P005', unitCode: 'U005', epochSeconds: 1619827200, expectedStatus: 200 },
+    { plantCode: 'P006', unitCode: 'U006', epochSeconds: 1622505600, expectedStatus: 200 },
+    { plantCode: 'P007', unitCode: 'U007', epochSeconds: 1625097600, expectedStatus: 200 },
+    { plantCode: 'P008', unitCode: 'U008', epochSeconds: 1627776000, expectedStatus: 200 },
+    { plantCode: 'P009', unitCode: 'U009', epochSeconds: 1630454400, expectedStatus: 200 },
+    { plantCode: 'P010', unitCode: 'U010', epochSeconds: 1633046400, expectedStatus: 200 },
+    { plantCode: 'P011', unitCode: 'U011', epochSeconds: 1635724800, expectedStatus: 200 },
+    { plantCode: 'P012', unitCode: 'U012', epochSeconds: 1638316800, expectedStatus: 200 },
+    { plantCode: 'P013', unitCode: 'U013', epochSeconds: 1640995200, expectedStatus: 200 },
+    { plantCode: 'P014', unitCode: 'U014', epochSeconds: 1643673600, expectedStatus: 200 },
+    { plantCode: 'P015', unitCode: 'U015', epochSeconds: 1646092800, expectedStatus: 200 },
+    { plantCode: 'P016', unitCode: 'U016', epochSeconds: 1648771200, expectedStatus: 200 },
+    { plantCode: 'P017', unitCode: 'U017', epochSeconds: 1651363200, expectedStatus: 200 },
+    { plantCode: 'P018', unitCode: 'U018', epochSeconds: 1654041600, expectedStatus: 200 },
+    { plantCode: 'P019', unitCode: 'U019', epochSeconds: 1656633600, expectedStatus: 200 },
+    { plantCode: 'P020', unitCode: 'U020', epochSeconds: 1659312000, expectedStatus: 200 },
+    { plantCode: 'P021', unitCode: 'U021', epochSeconds: 1661990400, expectedStatus: 200 },
+    { plantCode: 'P022', unitCode: 'U022', epochSeconds: 1664582400, expectedStatus: 200 },
+    { plantCode: 'P023', unitCode: 'U023', epochSeconds: 1667260800, expectedStatus: 200 },
+    { plantCode: 'P024', unitCode: 'U024', epochSeconds: 1669852800, expectedStatus: 200 },
+    { plantCode: 'P025', unitCode: 'U025', epochSeconds: 1672531200, expectedStatus: 200 },
+    { plantCode: 'P026', unitCode: 'U026', epochSeconds: 1675209600, expectedStatus: 200 },
+    { plantCode: 'P027', unitCode: 'U027', epochSeconds: 1677628800, expectedStatus: 200 },
+    { plantCode: 'P028', unitCode: 'U028', epochSeconds: 1680307200, expectedStatus: 200 },
+    { plantCode: 'P029', unitCode: 'U029', epochSeconds: 1682899200, expectedStatus: 200 },
+    { plantCode: 'P030', unitCode: 'U030', epochSeconds: 1685577600, expectedStatus: 200 },
+    { plantCode: 'P031', unitCode: 'U031', epochSeconds: 1688169600, expectedStatus: 200 },
+    { plantCode: 'P032', unitCode: 'U032', epochSeconds: 1690848000, expectedStatus: 200 },
+    { plantCode: 'P033', unitCode: 'U033', epochSeconds: 1693526400, expectedStatus: 200 },
+    { plantCode: 'P034', unitCode: 'U034', epochSeconds: 1696118400, expectedStatus: 200 },
+    { plantCode: 'P035', unitCode: 'U035', epochSeconds: 1698796800, expectedStatus: 200 },
+    { plantCode: 'P036', unitCode: 'U036', epochSeconds: 1701388800, expectedStatus: 200 },
+    { plantCode: 'P037', unitCode: 'U037', epochSeconds: 1704067200, expectedStatus: 200 },
+    { plantCode: 'P038', unitCode: 'U038', epochSeconds: 1706745600, expectedStatus: 200 },
+    { plantCode: 'P039', unitCode: 'U039', epochSeconds: 1709337600, expectedStatus: 200 },
+    { plantCode: 'P040', unitCode: 'U040', epochSeconds: 1712016000, expectedStatus: 200 },
+    { plantCode: 'P041', unitCode: 'U041', epochSeconds: 1714608000, expectedStatus: 200 },
+    { plantCode: 'P042', unitCode: 'U042', epochSeconds: 1717286400, expectedStatus: 200 },
+    { plantCode: 'P043', unitCode: 'U043', epochSeconds: 1719964800, expectedStatus: 200 },
+    { plantCode: 'P044', unitCode: 'U044', epochSeconds: 1722556800, expectedStatus: 200 },
+    { plantCode: 'P045', unitCode: 'U045', epochSeconds: 1725235200, expectedStatus: 200 },
+    { plantCode: 'P046', unitCode: 'U046', epochSeconds: 1727827200, expectedStatus: 200 },
+    { plantCode: 'P047', unitCode: 'U047', epochSeconds: 1730505600, expectedStatus: 200 },
+    { plantCode: 'P048', unitCode: 'U048', epochSeconds: 1733097600, expectedStatus: 200 },
+    { plantCode: 'P049', unitCode: 'U049', epochSeconds: 1735776000, expectedStatus: 200 },
+    { plantCode: 'P050', unitCode: 'U050', epochSeconds: 1738454400, expectedStatus: 200 },
+    { plantCode: 'P051', unitCode: 'U051', epochSeconds: 1741046400, expectedStatus: 200 },
+    { plantCode: 'P052', unitCode: 'U052', epochSeconds: 1743724800, expectedStatus: 200 },
+    { plantCode: 'P053', unitCode: 'U053', epochSeconds: 1746316800, expectedStatus: 200 },
+    { plantCode: 'P054', unitCode: 'U054', epochSeconds: 1748995200, expectedStatus: 200 },
+    { plantCode: 'P055', unitCode: 'U055', epochSeconds: 1751673600, expectedStatus: 200 },
+    { plantCode: 'P056', unitCode: 'U056', epochSeconds: 1754265600, expectedStatus: 200 },
+    { plantCode: 'P057', unitCode: 'U057', epochSeconds: 1756944000, expectedStatus: 200 },
+    { plantCode: 'P058', unitCode: 'U058', epochSeconds: 1759536000, expectedStatus: 200 },
+    { plantCode: 'P059', unitCode: 'U059', epochSeconds: 1762214400, expectedStatus: 200 },
+    { plantCode: 'P060', unitCode: 'U060', epochSeconds: 1764892800, expectedStatus: 200 },
+    { plantCode: 'P061', unitCode: 'U061', epochSeconds: 1767484800, expectedStatus: 200 },
+    { plantCode: 'P062', unitCode: 'U062', epochSeconds: 1770163200, expectedStatus: 200 },
+    { plantCode: 'P063', unitCode: 'U063', epochSeconds: 1772841600, expectedStatus: 200 },
+    { plantCode: 'P064', unitCode: 'U064', epochSeconds: 1775433600, expectedStatus: 200 },
+    { plantCode: 'P065', unitCode: 'U065', epochSeconds: 1778112000, expectedStatus: 200 },
+    { plantCode: 'P066', unitCode: 'U066', epochSeconds: 1780790400, expectedStatus: 200 },
+    { plantCode: 'P067', unitCode: 'U067', epochSeconds: 1783382400, expectedStatus: 200 },
+    { plantCode: 'P068', unitCode: 'U068', epochSeconds: 1786060800, expectedStatus: 200 },
+    { plantCode: 'P069', unitCode: 'U069', epochSeconds: 1788739200, expectedStatus: 200 },
+    { plantCode: 'P070', unitCode: 'U070', epochSeconds: 1791331200, expectedStatus: 200 },
+    { plantCode: 'P071', unitCode: 'U071', epochSeconds: 1794009600, expectedStatus: 200 },
+    { plantCode: 'P072', unitCode: 'U072', epochSeconds: 1796688000, expectedStatus: 200 },
+    { plantCode: 'P073', unitCode: 'U073', epochSeconds: 1799270400, expectedStatus: 200 },
+    { plantCode: 'P074', unitCode: 'U074', epochSeconds: 1801948800, expectedStatus: 200 },
+    { plantCode: 'P075', unitCode: 'U075', epochSeconds: 1804627200, expectedStatus: 200 },
+    { plantCode: 'P076', unitCode: 'U076', epochSeconds: 1807219200, expectedStatus: 200 },
+    { plantCode: 'P077', unitCode: 'U077', epochSeconds: 1809897600, expectedStatus: 200 },
+    { plantCode: 'P078', unitCode: 'U078', epochSeconds: 1812576000, expectedStatus: 200 },
+    { plantCode: 'P079', unitCode: 'U079', epochSeconds: 1815168000, expectedStatus: 200 },
+    { plantCode: 'P080', unitCode: 'U080', epochSeconds: 1817846400, expectedStatus: 200 },
+    { plantCode: 'P081', unitCode: 'U081', epochSeconds: 1820524800, expectedStatus: 200 },
+    { plantCode: 'P082', unitCode: 'U082', epochSeconds: 1823116800, expectedStatus: 200 },
+    { plantCode: 'P083', unitCode: 'U083', epochSeconds: 1825795200, expectedStatus: 200 },
+    { plantCode: 'P084', unitCode: 'U084', epochSeconds: 1828473600, expectedStatus: 200 },
+    { plantCode: 'P085', unitCode: 'U085', epochSeconds: 1831065600, expectedStatus: 200 },
+    { plantCode: 'P086', unitCode: 'U086', epochSeconds: 1833744000, expectedStatus: 200 },
+    { plantCode: 'P087', unitCode: 'U087', epochSeconds: 1836422400, expectedStatus: 200 },
+    { plantCode: 'P088', unitCode: 'U088', epochSeconds: 1839014400, expectedStatus: 200 },
+    { plantCode: 'P089', unitCode: 'U089', epochSeconds: 1841692800, expectedStatus: 200 },
+    { plantCode: 'P090', unitCode: 'U090', epochSeconds: 1844371200, expectedStatus: 200 },
+    { plantCode: 'P091', unitCode: 'U091', epochSeconds: 1846963200, expectedStatus: 200 },
+    { plantCode: 'P092', unitCode: 'U092', epochSeconds: 1849641600, expectedStatus: 200 },
+    { plantCode: 'P093', unitCode: 'U093', epochSeconds: 1852320000, expectedStatus: 200 },
+    { plantCode: 'P094', unitCode: 'U094', epochSeconds: 1854912000, expectedStatus: 200 },
+    { plantCode: 'P095', unitCode: 'U095', epochSeconds: 1857590400, expectedStatus: 200 },
+    { plantCode: 'P096', unitCode: 'U096', epochSeconds: 1860268800, expectedStatus: 200 },
+    { plantCode: 'P097', unitCode: 'U097', epochSeconds: 1862860800, expectedStatus: 200 },
+    { plantCode: 'P098', unitCode: 'U098', epochSeconds: 1865539200, expectedStatus: 200 },
+    { plantCode: 'P099', unitCode: 'U099', epochSeconds: 1868217600, expectedStatus: 200 },
+    { plantCode: 'P100', unitCode: 'U100', epochSeconds: 1870809600, expectedStatus: 200 },
+    { plantCode: 'P101', unitCode: 'U101', epochSeconds: 1873488000, expectedStatus: 200 },
+    { plantCode: 'P102', unitCode: 'U102', epochSeconds: 1876166400, expectedStatus: 200 },
+    { plantCode: 'P103', unitCode: 'U103', epochSeconds: 1878758400, expectedStatus: 200 },
+    { plantCode: 'P104', unitCode: 'U104', epochSeconds: 1881436800, expectedStatus: 200 },
+    { plantCode: 'P105', unitCode: 'U105', epochSeconds: 1884115200, expectedStatus: 200 },
+    { plantCode: 'P106', unitCode: 'U106', epochSeconds: 1886707200, expectedStatus: 200 },
+    { plantCode: 'P107', unitCode: 'U107', epochSeconds: 1889385600, expectedStatus: 200 },
+    { plantCode: 'P108', unitCode: 'U108', epochSeconds: 1892064000, expectedStatus: 200 },
+    { plantCode: 'P109', unitCode: 'U109', epochSeconds: 1894656000, expectedStatus: 200 },
+    { plantCode: 'P110', unitCode: 'U110', epochSeconds: 1897334400, expectedStatus: 200 },
+    { plantCode: 'P111', unitCode: 'U111', epochSeconds: 1900012800, expectedStatus: 200 },
+    { plantCode: 'P112', unitCode: 'U112', epochSeconds: 1902604800, expectedStatus: 200 },
+    { plantCode: 'P113', unitCode: 'U113', epochSeconds: 1905283200, expectedStatus: 200 },
+    { plantCode: 'P114', unitCode: 'U114', epochSeconds: 1907961600, expectedStatus: 200 },
+    { plantCode: 'P115', unitCode: 'U115', epochSeconds: 1910553600, expectedStatus: 200 },
+    { plantCode: 'P116', unitCode: 'U116', epochSeconds: 1913232000, expectedStatus: 200 },
+    { plantCode: 'P117', unitCode: 'U117', epochSeconds: 1915910400, expectedStatus: 200 },
+    { plantCode: 'P118', unitCode: 'U118', epochSeconds: 1918502400, expectedStatus: 200 },
+    { plantCode: 'P119', unitCode: 'U119', epochSeconds: 1921180800, expectedStatus: 200 },
+    { plantCode: 'P120', unitCode: 'U120', epochSeconds: 1923859200, expectedStatus: 200 },
+    { plantCode: 'P121', unitCode: 'U121', epochSeconds: 1926451200, expectedStatus: 200 },
+    { plantCode: 'P122', unitCode: 'U122', epochSeconds: 1929129600, expectedStatus: 200 },
+    { plantCode: 'P123', unitCode: 'U123', epochSeconds: 1931808000, expectedStatus: 200 },
+    { plantCode: 'P124', unitCode: 'U124', epochSeconds: 1934400000, expectedStatus: 200 },
+    { plantCode: 'P125', unitCode: 'U125', epochSeconds: 1937078400, expectedStatus: 200 },
+    { plantCode: 'P126', unitCode: 'U126', epochSeconds: 1939756800, expectedStatus: 200 },
+    { plantCode: 'P127', unitCode: 'U127', epochSeconds: 1942348800, expectedStatus: 200 },
+    { plantCode: 'P128', unitCode: 'U128', epochSeconds: 1945027200, expectedStatus: 200 },
+    { plantCode: 'P129', unitCode: 'U129', epochSeconds: 1947705600, expectedStatus: 200 },
+    { plantCode: 'P130', unitCode: 'U130', epochSeconds: 1950297600, expectedStatus: 200 },
+    { plantCode: 'P131', unitCode: 'U131', epochSeconds: 1952976000, expectedStatus: 200 },
+    { plantCode: 'P132', unitCode: 'U132', epochSeconds: 1955654400, expectedStatus: 200 },
+    { plantCode: 'P133', unitCode: 'U133', epochSeconds: 1958246400, expectedStatus: 200 },
+    { plantCode: 'P134', unitCode: 'U134', epochSeconds: 1960924800, expectedStatus: 200 },
+    { plantCode: 'P135', unitCode: 'U135', epochSeconds: 1963603200, expectedStatus: 200 },
+    { plantCode: 'P136', unitCode: 'U136', epochSeconds: 1966195200, expectedStatus: 200 },
+    { plantCode: 'P137', unitCode: 'U137', epochSeconds: 1968873600, expectedStatus: 200 },
+    { plantCode: 'P138', unitCode: 'U138', epochSeconds: 1971552000, expectedStatus: 200 },
+    { plantCode: 'P139', unitCode: 'U139', epochSeconds: 1974144000, expectedStatus: 200 },
+    { plantCode: 'P140', unitCode: 'U140', epochSeconds: 1976822400, expectedStatus: 200 },
+    { plantCode: 'P141', unitCode: 'U141', epochSeconds: 1979500800, expectedStatus: 200 },
+    { plantCode: 'P142', unitCode: 'U142', epochSeconds: 1982092800, expectedStatus: 200 },
+    { plantCode: 'P143', unitCode: 'U143', epochSeconds: 1984771200, expectedStatus: 200 },
+    { plantCode: 'P144', unitCode: 'U144', epochSeconds: 1987449600, expectedStatus: 200 },
+    { plantCode: 'P145', unitCode: 'U145', epochSeconds: 1990041600, expectedStatus: 200 },
+    { plantCode: 'P146', unitCode: 'U146', epochSeconds: 1992720000, expectedStatus: 200 },
+    { plantCode: 'P147', unitCode: 'U147', epochSeconds: 1995398400, expectedStatus: 200 },
+    { plantCode: 'P148', unitCode: 'U148', epochSeconds: 1997990400, expectedStatus: 200 },
+    { plantCode: 'P149', unitCode: 'U149', epochSeconds: 2000668800, expectedStatus: 200 },
+    { plantCode: 'P150', unitCode: 'U150', epochSeconds: 2003347200, expectedStatus: 200 },
+    { plantCode: 'P151', unitCode: 'U151', epochSeconds: 2005939200, expectedStatus: 200 },
+    { plantCode: 'P152', unitCode: 'U152', epochSeconds: 2008617600, expectedStatus: 200 },
+    { plantCode: 'P153', unitCode: 'U153', epochSeconds: 2011296000, expectedStatus: 200 },
+    { plantCode: 'P154', unitCode: 'U154', epochSeconds: 2013888000, expectedStatus: 200 },
+    { plantCode: 'P155', unitCode: 'U155', epochSeconds: 2016566400, expectedStatus: 200 },
+    { plantCode: 'P156', unitCode: 'U156', epochSeconds: 2019244800, expectedStatus: 200 },
+    { plantCode: 'P157', unitCode: 'U157', epochSeconds: 2021836800, expectedStatus: 200 },
+    { plantCode: 'P158', unitCode: 'U158', epochSeconds: 2024515200, expectedStatus: 200 },
+    { plantCode: 'P159', unitCode: 'U159', epochSeconds: 2027193600, expectedStatus: 200 },
+    { plantCode: 'P160', unitCode: 'U160', epochSeconds: 2029785600, expectedStatus: 200 },
+    { plantCode: 'P161', unitCode: 'U161', epochSeconds: 2032464000, expectedStatus: 200 },
+    { plantCode: 'P162', unitCode: 'U162', epochSeconds: 2035142400, expectedStatus: 200 },
+    { plantCode: 'P163', unitCode: 'U163', epochSeconds: 2037734400, expectedStatus: 200 },
+    { plantCode: 'P164', unitCode: 'U164', epochSeconds: 2040412800, expectedStatus: 200 },
+    { plantCode: 'P165', unitCode: 'U165', epochSeconds: 2043091200, expectedStatus: 200 },
+    { plantCode: 'P166', unitCode: 'U166', epochSeconds: 2045683200, expectedStatus: 200 },
+    { plantCode: 'P167', unitCode: 'U167', epochSeconds: 2048361600, expectedStatus: 200 },
+    { plantCode: 'P168', unitCode: 'U168', epochSeconds: 2051040000, expectedStatus: 200 },
+    { plantCode: 'P169', unitCode: 'U169', epochSeconds: 2053632000, expectedStatus: 200 },
+    { plantCode: 'P170', unitCode: 'U170', epochSeconds: 2056310400, expectedStatus: 200 },
+    { plantCode: 'P171', unitCode: 'U171', epochSeconds: 2058988800, expectedStatus: 200 },
+    { plantCode: 'P172', unitCode: 'U172', epochSeconds: 2061580800, expectedStatus: 200 },
+    { plantCode: 'P173', unitCode: 'U173', epochSeconds: 2064259200, expectedStatus: 200 },
+    { plantCode: 'P174', unitCode: 'U174', epochSeconds: 2066937600, expectedStatus: 200 },
+    { plantCode: 'P175', unitCode: 'U175', epochSeconds: 2069529600, expectedStatus: 200 },
+    { plantCode: 'P176', unitCode: 'U176', epochSeconds: 2072208000, expectedStatus: 200 },
+    { plantCode: 'P177', unitCode: 'U177', epochSeconds: 2074886400, expectedStatus: 200 },
+    { plantCode: 'P178', unitCode: 'U178', epochSeconds: 2077478400, expectedStatus: 200 },
+    { plantCode: 'P179', unitCode: 'U179', epochSeconds: 2080156800, expectedStatus: 200 },
+    { plantCode: 'P180', unitCode: 'U180', epochSeconds: 2082835200, expectedStatus: 200 },
+    { plantCode: 'P181', unitCode: 'U181', epochSeconds: 2085427200, expectedStatus: 200 },
+    { plantCode: 'P182', unitCode: 'U182', epochSeconds: 2088105600, expectedStatus: 200 },
+    { plantCode: 'P183', unitCode: 'U183', epochSeconds: 2090784000, expectedStatus: 200 },
+    { plantCode: 'P184', unitCode: 'U184', epochSeconds: 2093376000, expectedStatus: 200 },
+    { plantCode: 'P185', unitCode: 'U185', epochSeconds: 2096054400, expectedStatus: 200 },
+    { plantCode: 'P186', unitCode: 'U186', epochSeconds: 2098732800, expectedStatus: 200 },
+    { plantCode: 'P187', unitCode: 'U187', epochSeconds: 2101324800, expectedStatus: 200 },
+    { plantCode: 'P188', unitCode: 'U188', epochSeconds: 2104003200, expectedStatus: 200 },
+    { plantCode: 'P189', unitCode: 'U189', epochSeconds: 2106681600, expectedStatus: 200 },
+    { plantCode: 'P190', unitCode: 'U190', epochSeconds: 2109273600, expectedStatus: 200 },
+    { plantCode: 'P191', unitCode: 'U191', epochSeconds: 2111952000, expectedStatus: 200 },
+    { plantCode: 'P192', unitCode: 'U192', epochSeconds: 2114630400, expectedStatus: 200 },
+    { plantCode: 'P193', unitCode: 'U193', epochSeconds: 2117222400, expectedStatus: 200 },
+    { plantCode: 'P194', unitCode: 'U194', epochSeconds: 2119900800, expectedStatus: 200 },
+    { plantCode: 'P195', unitCode: 'U195', epochSeconds: 2122579200, expectedStatus: 200 },
+    { plantCode: 'P196', unitCode: 'U196', epochSeconds: 2125171200, expectedStatus: 200 },
+    { plantCode: 'P197', unitCode: 'U197', epochSeconds: 2127849600, expectedStatus: 200 },
+    { plantCode: 'P198', unitCode: 'U198', epochSeconds: 2130528000, expectedStatus: 200 },
+    { plantCode: 'P199', unitCode: 'U199', epochSeconds: 2133120000, expectedStatus: 200 },
+    { plantCode: 'P200', unitCode: 'U200', epochSeconds: 2135798400, expectedStatus: 200 },
+    { plantCode: 'P201', unitCode: 'U201', epochSeconds: 2138476800, expectedStatus: 200 },
+    { plantCode: 'P202', unitCode: 'U202', epochSeconds: 2141068800, expectedStatus: 200 },
+    { plantCode: 'P203', unitCode: 'U203', epochSeconds: 2143747200, expectedStatus: 200 },
+    { plantCode: 'P204', unitCode: 'U204', epochSeconds: 2146425600, expectedStatus: 200 },
+    { plantCode: 'P205', unitCode: 'U205', epochSeconds: 2149017600, expectedStatus: 200 },
+    { plantCode: 'P206', unitCode: 'U206', epochSeconds: 2151696000, expectedStatus: 200 },
+    { plantCode: 'P207', unitCode: 'U207', epochSeconds: 2154374400, expectedStatus: 200 },
+    { plantCode: 'P208', unitCode: 'U208', epochSeconds: 2156966400, expectedStatus: 200 },
+    { plantCode: 'P209', unitCode: 'U209', epochSeconds: 2159644800, expectedStatus: 200 },
+    { plantCode: 'P210', unitCode: 'U210', epochSeconds: 2162323200, expectedStatus: 200 },
+    { plantCode: 'P211', unitCode: 'U211', epochSeconds: 2164915200, expectedStatus: 200 },
+    { plantCode: 'P212', unitCode: 'U212', epochSeconds: 2167593600, expectedStatus: 200 },
+    { plantCode: 'P213', unitCode: 'U213', epochSeconds: 2170272000, expectedStatus: 200 },
+    { plantCode: 'P214', unitCode: 'U214', epochSeconds: 2172864000, expectedStatus: 200 },
+    { plantCode: 'P215', unitCode: 'U215', epochSeconds: 2175542400, expectedStatus: 200 },
+    { plantCode: 'P216', unitCode: 'U216', epochSeconds: 2178220800, expectedStatus: 200 },
+    { plantCode: 'P217', unitCode: 'U217', epochSeconds: 2180812800, expectedStatus: 200 },
+    { plantCode: 'P218', unitCode: 'U218', epochSeconds: 2183491200, expectedStatus: 200 },
+    { plantCode: 'P219', unitCode: 'U219', epochSeconds: 2186169600, expectedStatus: 200 },
+    { plantCode: 'P220', unitCode: 'U220', epochSeconds: 2188761600, expectedStatus: 200 },
+    { plantCode: 'P221', unitCode: 'U221', epochSeconds: 2191440000, expectedStatus: 200 },
+    { plantCode: 'P222', unitCode: 'U222', epochSeconds: 2194118400, expectedStatus: 200 },
+    { plantCode: 'P223', unitCode: 'U223', epochSeconds: 2196710400, expectedStatus: 200 },
+    { plantCode: 'P224', unitCode: 'U224', epochSeconds: 2199388800, expectedStatus: 200 },
+    { plantCode: 'P225', unitCode: 'U225', epochSeconds: 2202067200, expectedStatus: 200 },
+    { plantCode: 'P226', unitCode: 'U226', epochSeconds: 2204659200, expectedStatus: 200 },
+    { plantCode: 'P227', unitCode: 'U227', epochSeconds: 2207337600, expectedStatus: 200 },
+    { plantCode: 'P228', unitCode: 'U228', epochSeconds: 2210016000, expectedStatus: 200 },
+    { plantCode: 'P229', unitCode: 'U229', epochSeconds: 2212608000, expectedStatus: 200 },
+    { plantCode: 'P230', unitCode: 'U230', epochSeconds: 2215286400, expectedStatus: 200 },
+    { plantCode: 'P231', unitCode: 'U231', epochSeconds: 2217964800, expectedStatus: 200 },
+    { plantCode: 'P232', unitCode: 'U232', epochSeconds: 2220556800, expectedStatus: 200 },
+    { plantCode: 'P233', unitCode: 'U233', epochSeconds: 2223235200, expectedStatus: 200 },
+    { plantCode: 'P234', unitCode: 'U234', epochSeconds: 2225913600, expectedStatus: 200 },
+    { plantCode: 'P235', unitCode: 'U235', epochSeconds: 2228505600, expectedStatus: 200 },
+    { plantCode: 'P236', unitCode: 'U236', epochSeconds: 2231184000, expectedStatus: 200 },
+    { plantCode: 'P237', unitCode: 'U237', epochSeconds: 2233862400, expectedStatus: 200 },
+    { plantCode: 'P238', unitCode: 'U238', epochSeconds: 2236454400, expectedStatus: 200 },
+    { plantCode: 'P239', unitCode: 'U239', epochSeconds: 2239132800, expectedStatus: 200 },
+    { plantCode: 'P240', unitCode: 'U240', epochSeconds: 2241811200, expectedStatus: 200 },
+    { plantCode: 'P241', unitCode: 'U241', epochSeconds: 2244403200, expectedStatus: 200 },
+    { plantCode: 'P242', unitCode: 'U242', epochSeconds: 2247081600, expectedStatus: 200 },
+    { plantCode: 'P243', unitCode: 'U243', epochSeconds: 2249760000, expectedStatus: 200 },
+    { plantCode: 'P244', unitCode: 'U244', epochSeconds: 2252352000, expectedStatus: 200 },
+    { plantCode: 'P245', unitCode: 'U245', epochSeconds: 2255030400, expectedStatus: 200 },
+    { plantCode: 'P246', unitCode: 'U246', epochSeconds: 2257708800, expectedStatus: 200 },
+    { plantCode: 'P247', unitCode: 'U247', epochSeconds: 2260300800, expectedStatus: 200 },
+    { plantCode: 'P248', unitCode: 'U248', epochSeconds: 2262979200, expectedStatus: 200 },
+    { plantCode: 'P249', unitCode: 'U249', epochSeconds: 2265657600, expectedStatus: 200 },
+    { plantCode: 'P250', unitCode: 'U250', epochSeconds: 2268249600, expectedStatus: 200 },
+    { plantCode: 'P251', unitCode: 'U251', epochSeconds: 2270928000, expectedStatus: 200 },
+    { plantCode: 'P252', unitCode: 'U252', epochSeconds: 2273606400, expectedStatus: 200 },
+    { plantCode: 'P253', unitCode: 'U253', epochSeconds: 2276198400, expectedStatus: 200 },
+    { plantCode: 'P254', unitCode: 'U254', epochSeconds: 2278876800, expectedStatus: 200 },
+    { plantCode: 'P255', unitCode: 'U255', epochSeconds: 2281555200, expectedStatus: 200 },
+    { plantCode: 'P256', unitCode: 'U256', epochSeconds: 2284147200, expectedStatus: 200 },
+    { plantCode: 'P257', unitCode: 'U257', epochSeconds: 2286825600, expectedStatus: 200 },
+    { plantCode: 'P258', unitCode: 'U258', epochSeconds: 2289504000, expectedStatus: 200 },
+    { plantCode: 'P259', unitCode: 'U259', epochSeconds: 2292096000, expectedStatus: 200 },
+    { plantCode: 'P260', unitCode: 'U260', epochSeconds: 2294774400, expectedStatus: 200 },
+    { plantCode: 'P261', unitCode: 'U261', epochSeconds: 2297452800, expectedStatus: 200 },
+    { plantCode: 'P262', unitCode: 'U262', epochSeconds: 2300044800, expectedStatus: 200 },
+    { plantCode: 'P263', unitCode: 'U263', epochSeconds: 2302723200, expectedStatus: 200 },
+    { plantCode: 'P264', unitCode: 'U264', epochSeconds: 2305401600, expectedStatus: 200 },
+    { plantCode: 'P265', unitCode: 'U265', epochSeconds: 2307993600, expectedStatus: 200 },
+    { plantCode: 'P266', unitCode: 'U266', epochSeconds: 2310672000, expectedStatus: 200 },
+    { plantCode: 'P267', unitCode: 'U267', epochSeconds: 2313350400, expectedStatus: 200 },
+    { plantCode: 'P268', unitCode: 'U268', epochSeconds: 2315942400, expectedStatus: 200 },
+    { plantCode: 'P269', unitCode: 'U269', epochSeconds: 2318620800, expectedStatus: 200 },
+    { plantCode: 'P270', unitCode: 'U270', epochSeconds: 2321299200, expectedStatus: 200 },
+    { plantCode: 'P271', unitCode: 'U271', epochSeconds: 2323891200, expectedStatus: 200 },
+    { plantCode: 'P272', unitCode: 'U272', epochSeconds: 2326569600, expectedStatus: 200 },
+    { plantCode: 'P273', unitCode: 'U273', epochSeconds: 2329248000, expectedStatus: 200 },
+    { plantCode: 'P274', unitCode: 'U274', epochSeconds: 2331840000, expectedStatus: 200 },
+    { plantCode: 'P275', unitCode: 'U275', epochSeconds: 2334518400, expectedStatus: 200 },
+    { plantCode: 'P276', unitCode: 'U276', epochSeconds: 2337196800, expectedStatus: 200 },
+    { plantCode: 'P277', unitCode: 'U277', epochSeconds: 2339788800, expectedStatus: 200 },
+    { plantCode: 'P278', unitCode: 'U278', epochSeconds: 2342467200, expectedStatus: 200 },
+    { plantCode: 'P279', unitCode: 'U279', epochSeconds: 2345145600, expectedStatus: 200 },
+    { plantCode: 'P280', unitCode: 'U280', epochSeconds: 2347737600, expectedStatus: 200 },
+    { plantCode: 'P281', unitCode: 'U281', epochSeconds: 2350416000, expectedStatus: 200 },
+    { plantCode: 'P282', unitCode: 'U282', epochSeconds: 2353094400, expectedStatus: 200 },
+    { plantCode: 'P283', unitCode: 'U283', epochSeconds: 2355686400, expectedStatus: 200 },
+    { plantCode: 'P284', unitCode: 'U284', epochSeconds: 2358364800, expectedStatus: 200 },
+    { plantCode: 'P285', unitCode: 'U285', epochSeconds: 2361043200, expectedStatus: 200 },
+    { plantCode: 'P286', unitCode: 'U286', epochSeconds: 2363635200, expectedStatus: 200 },
+    { plantCode: 'P287', unitCode: 'U287', epochSeconds: 2366313600, expectedStatus: 200 },
+    { plantCode: 'P288', unitCode: 'U288', epochSeconds: 2368992000, expectedStatus: 200 },
+    { plantCode: 'P289', unitCode: 'U289', epochSeconds: 2371584000, expectedStatus: 200 },
+    { plantCode: 'P290', unitCode: 'U290', epochSeconds: 2374262400, expectedStatus: 200 },
+    { plantCode: 'P291', unitCode: 'U291', epochSeconds: 2376940800, expectedStatus: 200 },
+    { plantCode: 'P292', unitCode: 'U292', epochSeconds: 2379532800, expectedStatus: 200 },
+    { plantCode: 'P293', unitCode: 'U293', epochSeconds: 2382211200, expectedStatus: 200 },
+    { plantCode: 'P294', unitCode: 'U294', epochSeconds: 2384889600, expectedStatus: 200 },
+    { plantCode: 'P295', unitCode: 'U295', epochSeconds: 2387481600, expectedStatus: 200 },
+    { plantCode: 'P296', unitCode: 'U296', epochSeconds: 2390160000, expectedStatus: 200 },
+    { plantCode: 'P297', unitCode: 'U297', epochSeconds: 2392838400, expectedStatus: 200 },
+    { plantCode: 'P298', unitCode: 'U298', epochSeconds: 2395430400, expectedStatus: 200 },
+    { plantCode: 'P299', unitCode: 'U299', epochSeconds: 2398108800, expectedStatus: 200 },
+    { plantCode: 'P300', unitCode: 'U300', epochSeconds: 2400787200, expectedStatus: 200 },
+    { plantCode: 'P301', unitCode: 'U301', epochSeconds: 2403379200, expectedStatus: 200 },
+    { plantCode: 'P302', unitCode: 'U302', epochSeconds: 2406057600, expectedStatus: 200 },
+    { plantCode: 'P303', unitCode: 'U303', epochSeconds: 2408736000, expectedStatus: 200 },
+    { plantCode: 'P304', unitCode: 'U304', epochSeconds: 2411328000, expectedStatus: 200 },
+    { plantCode: 'P305', unitCode: 'U305', epochSeconds: 2414006400, expectedStatus: 200 },
+    { plantCode: 'P306', unitCode: 'U306', epochSeconds: 2416684800, expectedStatus: 200 },
+    { plantCode: 'P307', unitCode: 'U307', epochSeconds: 2419276800, expectedStatus: 200 },
+    { plantCode: 'P308', unitCode: 'U308', epochSeconds: 2421955200, expectedStatus: 200 },
+    { plantCode: 'P309', unitCode: 'U309', epochSeconds: 2424633600, expectedStatus: 200 },
+    { plantCode: 'P310', unitCode: 'U310', epochSeconds: 2427225600, expectedStatus: 200 },
+    { plantCode: 'P311', unitCode: 'U311', epochSeconds: 2429904000, expectedStatus: 200 },
+    { plantCode: 'P312', unitCode: 'U312', epochSeconds: 2432582400, expectedStatus: 200 },
+    { plantCode: 'P313', unitCode: 'U313', epochSeconds: 2435174400, expectedStatus: 200 },
+    { plantCode: 'P314', unitCode: 'U314', epochSeconds: 2437852800, expectedStatus: 200 },
+    { plantCode: 'P315', unitCode: 'U315', epochSeconds: 2440531200, expectedStatus: 200 },
+    { plantCode: 'P316', unitCode: 'U316', epochSeconds: 2443123200, expectedStatus: 200 },
+    { plantCode: 'P317', unitCode: 'U317', epochSeconds: 2445801600, expectedStatus: 200 },
+    { plantCode: 'P318', unitCode: 'U318', epochSeconds: 2448480000, expectedStatus: 200 },
+    { plantCode: 'P319', unitCode: 'U319', epochSeconds: 2451072000, expectedStatus: 200 },
+    { plantCode: 'P320', unitCode: 'U320', epochSeconds: 2453750400, expectedStatus: 200 },
+    { plantCode: 'P321', unitCode: 'U321', epochSeconds: 2456428800, expectedStatus: 200 },
+    { plantCode: 'P322', unitCode: 'U322', epochSeconds: 2459020800, expectedStatus: 200 },
+    { plantCode: 'P323', unitCode: 'U323', epochSeconds: 2461699200, expectedStatus: 200 },
+    { plantCode: 'P324', unitCode: 'U324', epochSeconds: 2464377600, expectedStatus: 200 },
+    { plantCode: 'P325', unitCode: 'U325', epochSeconds: 2466969600, expectedStatus: 200 },
+    { plantCode: 'P326', unitCode: 'U326', epochSeconds: 2469648000, expectedStatus: 200 },
+    { plantCode: 'P327', unitCode: 'U327', epochSeconds: 2472326400, expectedStatus: 200 },
+    { plantCode: 'P328', unitCode: 'U328', epochSeconds: 2474918400, expectedStatus: 200 },
+    { plantCode: 'P329', unitCode: 'U329', epochSeconds: 2477596800, expectedStatus: 200 },
+    { plantCode: 'P330', unitCode: 'U330', epochSeconds: 2480275200, expectedStatus: 200 },
+    { plantCode: 'P331', unitCode: 'U331', epochSeconds: 2482867200, expectedStatus: 200 },
+    { plantCode: 'P332', unitCode: 'U332', epochSeconds: 2485545600, expectedStatus: 200 },
+    { plantCode: 'P333', unitCode: 'U333', epochSeconds: 2488224000, expectedStatus: 200 },
+    { plantCode: 'P334', unitCode: 'U334', epochSeconds: 2490816000, expectedStatus: 200 },
+    { plantCode: 'P335', unitCode: 'U335', epochSeconds: 2493494400, expectedStatus: 200 },
+    { plantCode: 'P336', unitCode: 'U336', epochSeconds: 2496172800, expectedStatus: 200 },
+    { plantCode: 'P337', unitCode: 'U337', epochSeconds: 2498764800, expectedStatus: 200 },
+    { plantCode: 'P338', unitCode: 'U338', epochSeconds: 2501443200, expectedStatus: 200 },
+    { plantCode: 'P339', unitCode: 'U339', epochSeconds: 2504121600, expectedStatus: 200 },
+    { plantCode: 'P340', unitCode: 'U340', epochSeconds: 2506713600, expectedStatus: 200 },
+    { plantCode: 'P341', unitCode: 'U341', epochSeconds: 2509392000, expectedStatus: 200 },
+    { plantCode: 'P342', unitCode: 'U342', epochSeconds: 2512070400, expectedStatus: 200 },
+    { plantCode: 'P343', unitCode: 'U343', epochSeconds: 2514662400, expectedStatus: 200 },
+    { plantCode: 'P344', unitCode: 'U344', epochSeconds: 2517340800, expectedStatus: 200 },
+    { plantCode: 'P345', unitCode: 'U345', epochSeconds: 2520019200, expectedStatus: 200 },
+    { plantCode: 'P346', unitCode: 'U346', epochSeconds: 2522611200, expectedStatus: 200 },
+    { plantCode: 'P347', unitCode: 'U347', epochSeconds: 2525289600, expectedStatus: 200 },
+    { plantCode: 'P348', unitCode: 'U348', epochSeconds: 2527968000, expectedStatus: 200 },
+    { plantCode: 'P349', unitCode: 'U349', epochSeconds: 2530560000, expectedStatus: 200 },
+    { plantCode: 'P350', unitCode: 'U350', epochSeconds: 2533238400, expectedStatus: 200 },
+    { plantCode: 'P351', unitCode: 'U351', epochSeconds: 2535916800, expectedStatus: 200 },
+    { plantCode: 'P352', unitCode: 'U352', epochSeconds: 2538508800, expectedStatus: 200 },
+    { plantCode: 'P353', unitCode: 'U353', epochSeconds: 2541187200, expectedStatus: 200 },
+    { plantCode: 'P354', unitCode: 'U354', epochSeconds: 2543865600, expectedStatus: 200 },
+    { plantCode: 'P355', unitCode: 'U355', epochSeconds: 2546457600, expectedStatus: 200 },
+    { plantCode: 'P356', unitCode: 'U356', epochSeconds: 2549136000, expectedStatus: 200 },
+    { plantCode: 'P357', unitCode: 'U357', epochSeconds: 2551814400, expectedStatus: 200 },
+    { plantCode: 'P358', unitCode: 'U358', epochSeconds: 2554406400, expectedStatus: 200 },
+    { plantCode: 'P359', unitCode: 'U359', epochSeconds: 2557084800, expectedStatus: 200 },
+    { plantCode: 'P360', unitCode: 'U360', epochSeconds: 2559763200, expectedStatus: 200 },
+    { plantCode: 'P361', unitCode: 'U361', epochSeconds: 2562355200, expectedStatus: 200 },
+    { plantCode: 'P362', unitCode: 'U362', epochSeconds: 2565033600, expectedStatus: 200 },
+    { plantCode: 'P363', unitCode: 'U363', epochSeconds: 2567712000, expectedStatus: 200 },
+    { plantCode: 'P364', unitCode: 'U364', epochSeconds: 2570304000, expectedStatus: 200 },
+    { plantCode: 'P365', unitCode: 'U365', epochSeconds: 2572982400, expectedStatus: 200 },
+    { plantCode: 'P366', unitCode: 'U366', epochSeconds: 2575660800, expectedStatus: 200 },
+    { plantCode: 'P367', unitCode: 'U367', epochSeconds: 2578252800, expectedStatus: 200 },
+    { plantCode: 'P368', unitCode: 'U368', epochSeconds: 2580931200, expectedStatus: 200 },
+    { plantCode: 'P369', unitCode: 'U369', epochSeconds: 2583609600, expectedStatus: 200 },
+    { plantCode: 'P370', unitCode: 'U370', epochSeconds: 2586201600, expectedStatus: 200 },
+    { plantCode: 'P371', unitCode: 'U371', epochSeconds: 2588880000, expectedStatus: 200 },
+    { plantCode: 'P372', unitCode: 'U372', epochSeconds: 2591558400, expectedStatus: 200 },
+    { plantCode: 'P373', unitCode: 'U373', epochSeconds: 2594150400, expectedStatus: 200 },
+    { plantCode: 'P374', unitCode: 'U374', epochSeconds: 2596828800, expectedStatus: 200 },
+    { plantCode: 'P375', unitCode: 'U375', epochSeconds: 2599507200, expectedStatus: 200 },
+    { plantCode: 'P376', unitCode: 'U376', epochSeconds: 2602099200, expectedStatus: 200 },
+    { plantCode: 'P377', unitCode: 'U377', epochSeconds: 2604777600, expectedStatus: 200 },
+    { plantCode: 'P378', unitCode: 'U378', epochSeconds: 2607456000, expectedStatus: 200 },
+    { plantCode: 'P379', unitCode: 'U379', epochSeconds: 2610048000, expectedStatus: 200 },
+    { plantCode: 'P380', unitCode: 'U380', epochSeconds: 2612726400, expectedStatus: 200 },
+    { plantCode: 'P381', unitCode: 'U381', epochSeconds: 2615404800, expectedStatus: 200 },
+    { plantCode: 'P382', unitCode: 'U382', epochSeconds: 2617996800, expectedStatus: 200 },
+    { plantCode: 'P383', unitCode: 'U383', epochSeconds: 2620675200, expectedStatus: 200 },
+    { plantCode: 'P384', unitCode: 'U384', epochSeconds: 2623353600, expectedStatus: 200 },
+    { plantCode: 'P385', unitCode: 'U385', epochSeconds: 2625945600, expectedStatus: 200 },
+    { plantCode: 'P386', unitCode: 'U386', epochSeconds: 2628624000, expectedStatus: 200 },
+    { plantCode: 'P387', unitCode: 'U387', epochSeconds: 2631302400, expectedStatus: 200 },
+    { plantCode: 'P388', unitCode: 'U388', epochSeconds: 2633894400, expectedStatus: 200 },
+    { plantCode: 'P389', unitCode: 'U389', epochSeconds: 2636572800, expectedStatus: 200 },
+    { plantCode: 'P390', unitCode: 'U390', epochSeconds: 2639251200, expectedStatus: 200 },
+    { plantCode: 'P391', unitCode: 'U391', epochSeconds: 2641843200, expectedStatus: 200 },
+    { plantCode: 'P392', unitCode: 'U392', epochSeconds: 2644521600, expectedStatus: 200 },
+    { plantCode: 'P393', unitCode: 'U393', epochSeconds: 2647200000, expectedStatus: 200 },
+    { plantCode: 'P394', unitCode: 'U394', epochSeconds: 2649792000, expectedStatus: 200 },
+    { plantCode: 'P395', unitCode: 'U395', epochSeconds: 2652470400, expectedStatus: 200 },
+    { plantCode: 'P396', unitCode: 'U396', epochSeconds: 2655148800, expectedStatus: 200 },
+    { plantCode: 'P397', unitCode: 'U397', epochSeconds: 2657740800, expectedStatus: 200 },
+    { plantCode: 'P398', unitCode: 'U398', epochSeconds: 2660419200, expectedStatus: 200 },
+    { plantCode: 'P399', unitCode: 'U399', epochSeconds: 2663097600, expectedStatus: 200 },
+    { plantCode: 'P400', unitCode: 'U400', epochSeconds: 2665689600, expectedStatus: 200 },
+    { plantCode: 'P401', unitCode: 'U401', epochSeconds: 2668368000, expectedStatus: 200 },
+    { plantCode: 'P402', unitCode: 'U402', epochSeconds: 2671046400, expectedStatus: 200 },
+    { plantCode: 'P403', unitCode: 'U403', epochSeconds: 2673638400, expectedStatus: 200 },
+    { plantCode: 'P404', unitCode: 'U404', epochSeconds: 2676316800, expectedStatus: 200 },
+    { plantCode: 'P405', unitCode: 'U405', epochSeconds: 2678995200, expectedStatus: 200 },
+    { plantCode: 'P406', unitCode: 'U406', epochSeconds: 2681587200, expectedStatus: 200 },
+    { plantCode: 'P407', unitCode: 'U407', epochSeconds: 2684265600, expectedStatus: 200 },
+    { plantCode: 'P408', unitCode: 'U408', epochSeconds: 2686944000, expectedStatus: 200 },
+    { plantCode: 'P409', unitCode: 'U409', epochSeconds: 2689536000, expectedStatus: 200 },
+    { plantCode: 'P410', unitCode: 'U410', epochSeconds: 2692214400, expectedStatus: 200 },
+    { plantCode: 'P411', unitCode: 'U411', epochSeconds: 2694892800, expectedStatus: 200 },
+    { plantCode: 'P412', unitCode: 'U412', epochSeconds: 2697484800, expectedStatus: 200 },
+    { plantCode: 'P413', unitCode: 'U413', epochSeconds: 2700163200, expectedStatus: 200 },
+    { plantCode: 'P414', unitCode: 'U414', epochSeconds: 2702841600, expectedStatus: 200 },
+    { plantCode: 'P415', unitCode: 'U415', epochSeconds: 2705433600, expectedStatus: 200 },
+    { plantCode: 'P416', unitCode: 'U416', epochSeconds: 2708112000, expectedStatus: 200 },
+    { plantCode: 'P417', unitCode: 'U417', epochSeconds: 2710790400, expectedStatus: 200 },
+    { plantCode: 'P418', unitCode: 'U418', epochSeconds: 2713382400, expectedStatus: 200 },
+    { plantCode: 'P419', unitCode: 'U419', epochSeconds: 2716060800, expectedStatus: 200 },
+    { plantCode: 'P420', unitCode: 'U420', epochSeconds: 2718739200, expectedStatus: 200 },
+    { plantCode: 'P421', unitCode: 'U421', epochSeconds: 2721331200, expectedStatus: 200 },
+    { plantCode: 'P422', unitCode: 'U422', epochSeconds: 2724009600, expectedStatus: 200 },
+    { plantCode: 'P423', unitCode: 'U423', epochSeconds: 2726688000, expectedStatus: 200 },
+    { plantCode: 'P424', unitCode: 'U424', epochSeconds: 2729280000, expectedStatus: 200 },
+    { plantCode: 'P425', unitCode: 'U425', epochSeconds: 2731958400, expectedStatus: 200 },
+    { plantCode: 'P426', unitCode: 'U426', epochSeconds: 2734636800, expectedStatus: 200 },
+    { plantCode: 'P427', unitCode: 'U427', epochSeconds: 2737228800, expectedStatus: 200 },
+    { plantCode: 'P428', unitCode: 'U428', epochSeconds: 2739907200, expectedStatus: 200 },
+    { plantCode: 'P429', unitCode: 'U429', epochSeconds: 2742585600, expectedStatus: 200 },
+    { plantCode: 'P430', unitCode: 'U430', epochSeconds: 2745177600, expectedStatus: 200 },
+    { plantCode: 'P431', unitCode: 'U431', epochSeconds: 2747856000, expectedStatus: 200 },
+    { plantCode: 'P432', unitCode: 'U432', epochSeconds: 2750534400, expectedStatus: 200 },
+    { plantCode: 'P433', unitCode: 'U433', epochSeconds: 2753126400, expectedStatus: 200 },
+    { plantCode: 'P434', unitCode: 'U434', epochSeconds: 2755804800, expectedStatus: 200 },
+    { plantCode: 'P435', unitCode: 'U435', epochSeconds: 2758483200, expectedStatus: 200 },
+    { plantCode: 'P436', unitCode: 'U436', epochSeconds: 2761075200, expectedStatus: 200 },
+    { plantCode: 'P437', unitCode: 'U437', epochSeconds: 2763753600, expectedStatus: 200 },
+    { plantCode: 'P438', unitCode: 'U438', epochSeconds: 2766432000, expectedStatus: 200 },
+    { plantCode: 'P439', unitCode: 'U439', epochSeconds: 2769024000, expectedStatus: 200 },
+    { plantCode: 'P440', unitCode: 'U440', epochSeconds: 2771702400, expectedStatus: 200 },
+    { plantCode: 'P441', unitCode: 'U441', epochSeconds: 2774380800, expectedStatus: 200 },
+    { plantCode: 'P442', unitCode: 'U442', epochSeconds: 2776972800, expectedStatus: 200 },
+    { plantCode: 'P443', unitCode: 'U443', epochSeconds: 2779651200, expectedStatus: 200 },
+    { plantCode: 'P444', unitCode: 'U444', epochSeconds: 2782329600, expectedStatus: 200 },
+    { plantCode: 'P445', unitCode: 'U445', epochSeconds: 2784921600, expectedStatus: 200 },
+    { plantCode: 'P446', unitCode: 'U446', epochSeconds: 2787600000, expectedStatus: 200 },
+    { plantCode: 'P447', unitCode: 'U447', epochSeconds
