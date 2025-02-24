@@ -1,16 +1,14 @@
 import express from 'express';
 import { expect } from 'chai';
 import request from 'supertest';
-import { Transaction } from 'sequelize';
-import { sequelize } from '../../../src/infrastructure/orm/sqlize/index';
-import { BasicChargeRoutes } from '../../../src/infrastructure/routes/dpm/basicChargeRoutes';
+import { sequelize } from '../../../src/orm/sqlize/index.js';
+import { BasicChargeRoutes } from '../../../src/interface/routes/dpm/util.js';
 
 const app = express();
-app.use(express.json());
 BasicChargeRoutes(app);
 
 describe('PUT /basic-charge/plan', () => {
-  let transaction: Transaction;
+  let transaction;
 
   beforeEach(async () => {
     transaction = await sequelize.transaction();
@@ -23,215 +21,214 @@ describe('PUT /basic-charge/plan', () => {
   it('should successfully upsert a basic charge plan', async () => {
     const payload = [
       {
-        "plant-id": "PLANT1",
-        "unit-id": "UNIT1",
+        "plant-id": "P001",
+        "unit-id": "U001",
         "fiscal-year": 2023,
         "operation-input": 100,
         "maintenance-input": 50,
-        "user-id": "USER1"
+        "user-id": "user123"
       }
     ];
 
-    const response = await request(app)
+    const res = await request(app)
       .put('/basic-charge/plan')
       .send(payload)
       .set('Accept', 'application/json');
 
-    expect(response.status).to.equal(200);
-    expect(response.body).to.equal('OK');
+    expect(res.status).to.equal(200);
+    expect(res.body).to.equal('OK');
   });
 
-  it('should handle empty payload gracefully', async () => {
-    const payload: any[] = [];
+  it('should fail when payload is empty', async () => {
+    const payload = [];
 
-    const response = await request(app)
+    const res = await request(app)
       .put('/basic-charge/plan')
       .send(payload)
       .set('Accept', 'application/json');
 
-    expect(response.status).to.equal(200);
-    expect(response.body).to.equal('OK');
+    expect(res.status).to.equal(400);
   });
 
-  it('should return error for missing plant-id', async () => {
+  it('should fail when plant-id is missing', async () => {
     const payload = [
       {
-        "unit-id": "UNIT1",
+        "unit-id": "U001",
         "fiscal-year": 2023,
         "operation-input": 100,
         "maintenance-input": 50,
-        "user-id": "USER1"
+        "user-id": "user123"
       }
     ];
 
-    const response = await request(app)
+    const res = await request(app)
       .put('/basic-charge/plan')
       .send(payload)
       .set('Accept', 'application/json');
 
-    expect(response.status).to.equal(400);
+    expect(res.status).to.equal(400);
   });
 
-  it('should return error for missing unit-id', async () => {
+  it('should fail when unit-id is missing', async () => {
     const payload = [
       {
-        "plant-id": "PLANT1",
+        "plant-id": "P001",
         "fiscal-year": 2023,
         "operation-input": 100,
         "maintenance-input": 50,
-        "user-id": "USER1"
+        "user-id": "user123"
       }
     ];
 
-    const response = await request(app)
+    const res = await request(app)
       .put('/basic-charge/plan')
       .send(payload)
       .set('Accept', 'application/json');
 
-    expect(response.status).to.equal(400);
+    expect(res.status).to.equal(400);
   });
 
-  it('should return error for missing fiscal-year', async () => {
+  it('should fail when fiscal-year is missing', async () => {
     const payload = [
       {
-        "plant-id": "PLANT1",
-        "unit-id": "UNIT1",
+        "plant-id": "P001",
+        "unit-id": "U001",
         "operation-input": 100,
         "maintenance-input": 50,
-        "user-id": "USER1"
+        "user-id": "user123"
       }
     ];
 
-    const response = await request(app)
+    const res = await request(app)
       .put('/basic-charge/plan')
       .send(payload)
       .set('Accept', 'application/json');
 
-    expect(response.status).to.equal(400);
+    expect(res.status).to.equal(400);
   });
 
-  it('should return error for missing operation-input', async () => {
+  it('should fail when operation-input is missing', async () => {
     const payload = [
       {
-        "plant-id": "PLANT1",
-        "unit-id": "UNIT1",
+        "plant-id": "P001",
+        "unit-id": "U001",
         "fiscal-year": 2023,
         "maintenance-input": 50,
-        "user-id": "USER1"
+        "user-id": "user123"
       }
     ];
 
-    const response = await request(app)
+    const res = await request(app)
       .put('/basic-charge/plan')
       .send(payload)
       .set('Accept', 'application/json');
 
-    expect(response.status).to.equal(400);
+    expect(res.status).to.equal(400);
   });
 
-  it('should return error for missing maintenance-input', async () => {
+  it('should fail when maintenance-input is missing', async () => {
     const payload = [
       {
-        "plant-id": "PLANT1",
-        "unit-id": "UNIT1",
+        "plant-id": "P001",
+        "unit-id": "U001",
         "fiscal-year": 2023,
         "operation-input": 100,
-        "user-id": "USER1"
+        "user-id": "user123"
       }
     ];
 
-    const response = await request(app)
+    const res = await request(app)
       .put('/basic-charge/plan')
       .send(payload)
       .set('Accept', 'application/json');
 
-    expect(response.status).to.equal(400);
+    expect(res.status).to.equal(400);
   });
 
-  it('should return error for missing user-id', async () => {
+  it('should fail when user-id is missing', async () => {
     const payload = [
       {
-        "plant-id": "PLANT1",
-        "unit-id": "UNIT1",
+        "plant-id": "P001",
+        "unit-id": "U001",
         "fiscal-year": 2023,
         "operation-input": 100,
         "maintenance-input": 50
       }
     ];
 
-    const response = await request(app)
+    const res = await request(app)
       .put('/basic-charge/plan')
       .send(payload)
       .set('Accept', 'application/json');
 
-    expect(response.status).to.equal(400);
+    expect(res.status).to.equal(400);
   });
 
-  it('should return error for invalid fiscal-year type', async () => {
+  it('should fail when fiscal-year is not a number', async () => {
     const payload = [
       {
-        "plant-id": "PLANT1",
-        "unit-id": "UNIT1",
+        "plant-id": "P001",
+        "unit-id": "U001",
         "fiscal-year": "2023",
         "operation-input": 100,
         "maintenance-input": 50,
-        "user-id": "USER1"
+        "user-id": "user123"
       }
     ];
 
-    const response = await request(app)
+    const res = await request(app)
       .put('/basic-charge/plan')
       .send(payload)
       .set('Accept', 'application/json');
 
-    expect(response.status).to.equal(400);
+    expect(res.status).to.equal(400);
   });
 
-  it('should return error for invalid operation-input type', async () => {
+  it('should fail when operation-input is not a number', async () => {
     const payload = [
       {
-        "plant-id": "PLANT1",
-        "unit-id": "UNIT1",
+        "plant-id": "P001",
+        "unit-id": "U001",
         "fiscal-year": 2023,
         "operation-input": "100",
         "maintenance-input": 50,
-        "user-id": "USER1"
+        "user-id": "user123"
       }
     ];
 
-    const response = await request(app)
+    const res = await request(app)
       .put('/basic-charge/plan')
       .send(payload)
       .set('Accept', 'application/json');
 
-    expect(response.status).to.equal(400);
+    expect(res.status).to.equal(400);
   });
 
-  it('should return error for invalid maintenance-input type', async () => {
+  it('should fail when maintenance-input is not a number', async () => {
     const payload = [
       {
-        "plant-id": "PLANT1",
-        "unit-id": "UNIT1",
+        "plant-id": "P001",
+        "unit-id": "U001",
         "fiscal-year": 2023,
         "operation-input": 100,
         "maintenance-input": "50",
-        "user-id": "USER1"
+        "user-id": "user123"
       }
     ];
 
-    const response = await request(app)
+    const res = await request(app)
       .put('/basic-charge/plan')
       .send(payload)
       .set('Accept', 'application/json');
 
-    expect(response.status).to.equal(400);
+    expect(res.status).to.equal(400);
   });
 
-  it('should return error for invalid user-id type', async () => {
+  it('should fail when user-id is not a string', async () => {
     const payload = [
       {
-        "plant-id": "PLANT1",
-        "unit-id": "UNIT1",
+        "plant-id": "P001",
+        "unit-id": "U001",
         "fiscal-year": 2023,
         "operation-input": 100,
         "maintenance-input": 50,
@@ -239,160 +236,149 @@ describe('PUT /basic-charge/plan', () => {
       }
     ];
 
-    const response = await request(app)
+    const res = await request(app)
       .put('/basic-charge/plan')
       .send(payload)
       .set('Accept', 'application/json');
 
-    expect(response.status).to.equal(400);
+    expect(res.status).to.equal(400);
   });
 
-  it('should handle null operation-input', async () => {
+  it('should fail when plant-id is not a string', async () => {
     const payload = [
       {
-        "plant-id": "PLANT1",
-        "unit-id": "UNIT1",
+        "plant-id": 123,
+        "unit-id": "U001",
+        "fiscal-year": 2023,
+        "operation-input": 100,
+        "maintenance-input": 50,
+        "user-id": "user123"
+      }
+    ];
+
+    const res = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .set('Accept', 'application/json');
+
+    expect(res.status).to.equal(400);
+  });
+
+  it('should fail when unit-id is not a string', async () => {
+    const payload = [
+      {
+        "plant-id": "P001",
+        "unit-id": 123,
+        "fiscal-year": 2023,
+        "operation-input": 100,
+        "maintenance-input": 50,
+        "user-id": "user123"
+      }
+    ];
+
+    const res = await request(app)
+      .put('/basic-charge/plan')
+      .send(payload)
+      .set('Accept', 'application/json');
+
+    expect(res.status).to.equal(400);
+  });
+
+  it('should fail when operation-input is null', async () => {
+    const payload = [
+      {
+        "plant-id": "P001",
+        "unit-id": "U001",
         "fiscal-year": 2023,
         "operation-input": null,
         "maintenance-input": 50,
-        "user-id": "USER1"
+        "user-id": "user123"
       }
     ];
 
-    const response = await request(app)
+    const res = await request(app)
       .put('/basic-charge/plan')
       .send(payload)
       .set('Accept', 'application/json');
 
-    expect(response.status).to.equal(200);
-    expect(response.body).to.equal('OK');
+    expect(res.status).to.equal(400);
   });
 
-  it('should handle null maintenance-input', async () => {
+  it('should fail when maintenance-input is null', async () => {
     const payload = [
       {
-        "plant-id": "PLANT1",
-        "unit-id": "UNIT1",
+        "plant-id": "P001",
+        "unit-id": "U001",
         "fiscal-year": 2023,
         "operation-input": 100,
         "maintenance-input": null,
-        "user-id": "USER1"
+        "user-id": "user123"
       }
     ];
 
-    const response = await request(app)
+    const res = await request(app)
       .put('/basic-charge/plan')
       .send(payload)
       .set('Accept', 'application/json');
 
-    expect(response.status).to.equal(200);
-    expect(response.body).to.equal('OK');
+    expect(res.status).to.equal(400);
   });
 
-  it('should handle multiple entries in payload', async () => {
-    const payload = [
-      {
-        "plant-id": "PLANT1",
-        "unit-id": "UNIT1",
-        "fiscal-year": 2023,
-        "operation-input": 100,
-        "maintenance-input": 50,
-        "user-id": "USER1"
-      },
-      {
-        "plant-id": "PLANT2",
-        "unit-id": "UNIT2",
-        "fiscal-year": 2024,
-        "operation-input": 200,
-        "maintenance-input": 100,
-        "user-id": "USER2"
-      }
-    ];
+  it('should fail when payload is not an array', async () => {
+    const payload = {
+      "plant-id": "P001",
+      "unit-id": "U001",
+      "fiscal-year": 2023,
+      "operation-input": 100,
+      "maintenance-input": 50,
+      "user-id": "user123"
+    };
 
-    const response = await request(app)
+    const res = await request(app)
       .put('/basic-charge/plan')
       .send(payload)
       .set('Accept', 'application/json');
 
-    expect(response.status).to.equal(200);
-    expect(response.body).to.equal('OK');
+    expect(res.status).to.equal(400);
   });
 
-  it('should return error for duplicate entries in payload', async () => {
-    const payload = [
-      {
-        "plant-id": "PLANT1",
-        "unit-id": "UNIT1",
-        "fiscal-year": 2023,
-        "operation-input": 100,
-        "maintenance-input": 50,
-        "user-id": "USER1"
-      },
-      {
-        "plant-id": "PLANT1",
-        "unit-id": "UNIT1",
-        "fiscal-year": 2023,
-        "operation-input": 200,
-        "maintenance-input": 100,
-        "user-id": "USER1"
-      }
-    ];
+  it('should fail when payload is null', async () => {
+    const res = await request(app)
+      .put('/basic-charge/plan')
+      .send(null)
+      .set('Accept', 'application/json');
 
-    const response = await request(app)
+    expect(res.status).to.equal(400);
+  });
+
+  it('should fail when payload is undefined', async () => {
+    const res = await request(app)
+      .put('/basic-charge/plan')
+      .send(undefined)
+      .set('Accept', 'application/json');
+
+    expect(res.status).to.equal(400);
+  });
+
+  it('should fail when payload is a string', async () => {
+    const payload = "invalid payload";
+
+    const res = await request(app)
       .put('/basic-charge/plan')
       .send(payload)
       .set('Accept', 'application/json');
 
-    expect(response.status).to.equal(400);
+    expect(res.status).to.equal(400);
   });
 
-  it('should return error for invalid JSON payload', async () => {
-    const payload = '{ "plant-id": "PLANT1", "unit-id": "UNIT1", "fiscal-year": 2023, "operation-input": 100, "maintenance-input": 50, "user-id": "USER1" ';
+  it('should fail when payload is a number', async () => {
+    const payload = 123;
 
-    const response = await request(app)
+    const res = await request(app)
       .put('/basic-charge/plan')
       .send(payload)
       .set('Accept', 'application/json');
 
-    expect(response.status).to.equal(400);
-  });
-
-  it('should return error for unsupported HTTP method', async () => {
-    const payload = [
-      {
-        "plant-id": "PLANT1",
-        "unit-id": "UNIT1",
-        "fiscal-year": 2023,
-        "operation-input": 100,
-        "maintenance-input": 50,
-        "user-id": "USER1"
-      }
-    ];
-
-    const response = await request(app)
-      .post('/basic-charge/plan')
-      .send(payload)
-      .set('Accept', 'application/json');
-
-    expect(response.status).to.equal(404);
-  });
-
-  it('should return error for missing Content-Type header', async () => {
-    const payload = [
-      {
-        "plant-id": "PLANT1",
-        "unit-id": "UNIT1",
-        "fiscal-year": 2023,
-        "operation-input": 100,
-        "maintenance-input": 50,
-        "user-id": "USER1"
-      }
-    ];
-
-    const response = await request(app)
-      .put('/basic-charge/plan')
-      .send(payload);
-
-    expect(response.status).to.equal(400);
+    expect(res.status).to.equal(400);
   });
 });

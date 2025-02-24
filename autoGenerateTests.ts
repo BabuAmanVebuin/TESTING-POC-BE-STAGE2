@@ -20,6 +20,7 @@ const portDir = path.join(__dirname, "./src/application/port")
 const entityDir = path.join(__dirname, "./src/infrastructure/orm/typeorm/entities")
 const dtoDir = path.join(__dirname, "./src/domain")
 const routeDir = path.join(__dirname, "./src")
+const sqlDir = path.join(__dirname, "./src/interface/controllers/dpm")
 // Step 5: Define Test Output Directory
 const testOutputDir = path.join(__dirname, "./test/test4o")
 // Step 6: Ensure Test Directory Exists
@@ -45,7 +46,17 @@ const detectedControllers = getAllTsFiles(controllersDir)
 // Step 9: Define the mapping between use cases and their corresponding files
 function getFileMapping(): Record<
   string,
-  { apiPath: string; repoName: string; useCase: string; repo: string[]; port: string[]; entity: string[]; dto: string; route: string }
+  {
+    apiPath: string
+    repoName: string
+    useCase: string
+    repo: string[]
+    port: string[]
+    entity: string[]
+    dto: string[]
+    route: string
+    sql: string[]
+  }
 > {
   return {
     getBasicChargePlan: {
@@ -55,8 +66,9 @@ function getFileMapping(): Record<
       repo: ["BasicChargeRepositorySequelizeMySQL.ts"],
       port: ["BasicChargeRepositoryPort.ts"],
       entity: [],
-      dto: "entities/dpm/basicChargePlan.ts",
+      dto: ["entities/dpm/basicChargePlan.ts"],
       route: "infrastructure/webserver/express/basicChargeRoutes.ts",
+      sql: [],
     },
     upsertBasicChargePlan: {
       apiPath: "PUT /basic-charge/plan",
@@ -65,8 +77,9 @@ function getFileMapping(): Record<
       repo: ["BasicChargeRepositorySequelizeMySQL.ts"],
       port: ["BasicChargeRepositoryPort.ts"],
       entity: [],
-      dto: "entities/dpm/basicChargePlan.ts",
+      dto: ["entities/dpm/basicChargePlan.ts"],
       route: "infrastructure/webserver/express/basicChargeRoutes.ts",
+      sql: [],
     },
     getBasicChargePlanSummary: {
       apiPath: "GET /basic-charge/plan/summary",
@@ -75,8 +88,9 @@ function getFileMapping(): Record<
       repo: ["BasicChargeRepositorySequelizeMySQL.ts"],
       port: ["BasicChargeRepositoryPort.ts"],
       entity: [],
-      dto: "entities/dpm/basicChargePlanSummary.ts",
+      dto: ["entities/dpm/basicChargePlanSummary.ts"],
       route: "infrastructure/webserver/express/basicChargeRoutes.ts",
+      sql: [],
     },
     getBasicCharge: {
       apiPath: "GET /basic-charge",
@@ -85,8 +99,20 @@ function getFileMapping(): Record<
       repo: ["snowflake/basicChargeRepositorySnowflake.ts"],
       port: ["BasicChargeRepositoryPort.ts"],
       entity: [],
-      dto: "models/dpm/KPI003/Index.ts",
+      dto: ["models/dpm/KPI003/Index.ts"],
       route: "interface/routes/dpm/getBasicCharge.ts",
+      sql: [],
+    },
+    getKPI004: {
+      apiPath: "GET /kpi004",
+      repoName: "",
+      useCase: "",
+      repo: [],
+      port: ["Kpi003RepositoryPort.ts"],
+      entity: [],
+      dto: ["models/dpm/Kpi004.ts"],
+      route: "interface/routes/dpm/getKPI004.ts",
+      sql: ["KPI004/sql/KPI004Query.ts"],
     },
     // Define mappings for other use cases...
   }
@@ -107,8 +133,9 @@ const detectedTestFiles = detectedControllers.map((controllerPath) => {
     repo: [],
     port: [],
     entity: [],
-    dto: "",
+    dto: [],
     route: "",
+    sql: [],
   }
 
   // Map the repository, port, entity, dto, and route paths
@@ -116,16 +143,18 @@ const detectedTestFiles = detectedControllers.map((controllerPath) => {
   const repoPath = files.repo.map((repo) => path.join(repositoriesDir, repo))
   const portPath = files.port.map((port) => path.join(portDir, port))
   const entityPath = files.entity.map((entity) => path.join(entityDir, entity))
-  const dtoPath = files.dto ? path.join(dtoDir, files.dto) : ""
+  const dtoPath = files.dto.map((dto) => path.join(dtoDir, dto))
   const routePath = files.route ? path.join(routeDir, files.route) : ""
+  const sqlPath = files.sql.map((sql) => path.join(sqlDir, sql))
 
   // Check if the required files exist
   const useCaseExists = useCasePath && fs.existsSync(useCasePath)
   const repoExists = repoPath && repoPath.every((repo) => fs.existsSync(repo))
   const portExists = portPath && portPath.every((port) => fs.existsSync(port))
   const entityExists = entityPath && entityPath.every((entity) => fs.existsSync(entity))
-  const dtoExists = dtoPath && fs.existsSync(dtoPath)
+  const dtoExists = dtoPath && dtoPath.every((dto) => fs.existsSync(dto))
   const routeExists = routePath && fs.existsSync(routePath)
+  const sqlExists = sqlPath && sqlPath.every((sql) => fs.existsSync(sql))
 
   console.log(`📝 Checking: ${baseName}`)
   console.log(`  🔹 API Path: ${files.apiPath || "N/A"} → Exists? ${files.apiPath ? true : false}`)
@@ -137,6 +166,7 @@ const detectedTestFiles = detectedControllers.map((controllerPath) => {
   console.log(`  🔹 Entity: ${files.entity || "N/A"} → Exists? ${entityExists}`)
   console.log(`  🔹 DTO: ${files.dto || "N/A"} → Exists? ${dtoExists}`)
   console.log(`  🔹 Route: ${files.route || "N/A"} → Exists? ${routeExists}`)
+  console.log(`  🔹 SQL: ${files.sql || "N/A"} → Exists? ${sqlExists}`)
 
   return {
     name: `${baseName}.test.ts`,
@@ -149,6 +179,7 @@ const detectedTestFiles = detectedControllers.map((controllerPath) => {
     entity: entityExists ? files.entity : null,
     dto: dtoExists ? files.dto : null,
     route: routeExists ? files.route : null,
+    sql: sqlExists ? files.sql : null,
   }
 })
 
@@ -172,163 +203,59 @@ async function generateTest(
   repositoryFile: string[] | null,
   portFile: string[] | null,
   entityFile: string[] | null,
-  dtoFile: string | null,
+  dtoFile: string[] | null,
   routeFile: string | null,
+  sqlFile: string[] | null,
 ) {
   const controllerPath = path.join(controllersDir, controllerFile)
   const useCasePath = useCaseFile ? path.join(useCasesDir, useCaseFile) : null
   const repositoryPath = repositoryFile?.map((repo) => path.join(repositoriesDir, repo))
   const portPath = portFile?.map((port) => path.join(portDir, port))
   const entityPath = entityFile?.map((entity) => path.join(entityDir, entity))
-  const dtoPath = dtoFile ? path.join(dtoDir, dtoFile) : null
+  const dtoPath = dtoFile?.map((dtoFile) => path.join(dtoDir, dtoFile))
   const routePath = routeFile ? path.join(routeDir, routeFile) : null
+  const sqlPath = sqlFile?.map((sqlFile) => path.join(sqlDir, sqlFile))
 
   const controllerCode = readFileContent(controllerPath)
   const useCaseCode = useCasePath ? readFileContent(useCasePath) : null
   const repositoryCode = repositoryPath?.map(readFileContent)
   const portCode = portPath?.map(readFileContent)
   const entityCode = entityPath?.map(readFileContent)
-  const dtoCode = dtoPath ? readFileContent(dtoPath) : null
+  const dtoCode = dtoPath?.map(readFileContent)
   const routeCode = routePath ? readFileContent(routePath) : null
+  const sqlCode = sqlPath?.map(readFileContent)
 
-  if (!controllerCode || !useCaseCode || !repositoryCode || !routeCode) {
+  if (!controllerCode || !routeCode) {
     console.error(`❌ Skipping test generation for ${fileName} due to missing files.`)
     return
   }
 
   // Step 13: Creating a Integration Test Prompt
   const integrationPrompt = `
-  STRICTLY FOLLOW THE INSTRUCTIONS BELOW WITHOUT EXCEPTION:
+ Generate an exhaustive integration API test in TypeScript for the following API components—ONLY for the specified API path—with more than 20 test cases covering the full API flow (including both success and failure scenarios). Use Mocha as the test runner, Chai for assertions, Supertest for API requests, and Sequelize transactions to manage the database state.
 
-  Given the following TypeScript files, you MUST generate test cases for ONLY the specified API Path:
+Requirements:
+- Use relative imports (e.g., '../../../src/...', not '@src/').
+- Manage Sequelize transactions properly (open, rollback, and close transactions).
+- Import modules using '../../../src/...' without module aliases.
+- Initialize the Express app as follows:
+  import express from 'express';
+  const app = express();
+  BasicChargeRoutes(app);
+- Output only valid plain TypeScript Mocha test code with no comments, explanations, or extra text, and do not wrap the output in code blocks.
 
-  API Path:
-  \`\`\`typescript
-  ${apiPath}
-  \`\`\`
+All instructions are mandatory.
 
-  Route:
-  \`\`\`typescript
-  ${routeCode}
-  \`\`\`
-
-  Controller:
-  \`\`\`typescript
-  ${controllerCode}
-  \`\`\`
-
-  Use Case:
-  \`\`\`typescript
-  ${useCaseCode}
-  \`\`\`
-
-  Repository: ${repoName}
-  \`\`\`typescript
-  ${repositoryCode}
-  \`\`\`
-
-  Port:
-  \`\`\`typescript
-  ${portCode}
-  \`\`\`
-
-  Entity:
-  \`\`\`typescript
-  ${entityCode}
-  \`\`\`
-
-  DTO:
-  \`\`\`typescript
-  ${dtoCode}
-  \`\`\`
-
-  YOU MUST GENERATE a complete and exhaustive integration API test consisting of a minimum of 20 test cases, focusing on the full API flow from beginning to end in TypeScript.
-
-  MANDATORY REQUIREMENTS (DO NOT IGNORE ANY):
-  - The test MUST be written using Mocha as the test runner.
-  - The test MUST use Chai for assertions.
-  - The test MUST use Supertest for API requests.
-  - The test MUST manage database state using Sequelize transactions.
-  - The test MUST ensure ALL POSSIBLE CASES, including both SUCCESS and FAILURE scenarios, are covered completely.
-  - DO NOT SKIP ANY CONTENTS OR EDGE CASES.
-  - DO NOT wrap the output inside code blocks like \`\`\`typescript.
-  - The output MUST ONLY contain valid TypeScript Mocha test code—NO COMMENTS, NO EXPLANATIONS, NO EXTRA TEXT.
-  - FAILURE TO FOLLOW THESE INSTRUCTIONS WILL BE CONSIDERED AN ERROR.
-
-  ADDITIONAL MANDATORY FIXES TO AVOID COMMON ERRORS:
-  1. Ensure correct relative imports:
-     - The test file MUST use '../../../src/...' instead of '@src/'.
-     - Example:
-       ✅ Correct:
-       \`import { createRouter } from '../../../src/infrastructure/webserver/express/routes';\`  
-       ❌ Incorrect:
-       \`import { createRouter } from '@src/infrastructure/webserver/express/routes';\`
-
-  2. Ensure Sequelize handles transactions correctly:
-     - The test MUST use transaction management for inserting and rolling back test data.
-     - Example:
-       \`import { Transaction } from 'sequelize'; let transaction: Transaction;\`
-     - The test MUST properly close transactions after tests.
-
-  3. Ensure Mocha resolves paths properly:
-     - The test MUST import modules using '../../../src/...'.
-     - The test MUST NOT use module aliases.
-
-  4. Ensure test output is not wrapped in code blocks:
-     - The generated test MUST not wrap the test code inside TypeScript code blocks like \`\`\`\typescript\`\`\`. It should be plain TypeScript code without any wrapping.
-
-  5. Ensure Express App Initialization:
-   - The test MUST import and initialize the Express app like this:
-   \`\`\`typescript
-   import express from 'express';
-   const app = express();
-   BasicChargeRoutes(app);
-   \`\`\`
-   - DO NOT use alternative app setup methods. Ensure this structure is maintained for all tests.
-
-  6. Strict Instructions Sometimes Don’t Work
-    - All instructions given here are mandatory.
-    - If any instruction conflicts, the stricter or more specific rule must be followed.
-
-  7. Type-Related Issues
-    - Avoid sprinkling any types.
-    - If code can infer or define more specific types, use them (e.g., interface, type).
-
-  8. Avoid Creating Unnecessary Empty Objects
-    - Avoid creating unnecessary empty objects.
-    - Do not send empty payloads or objects unless you are explicitly testing a scenario that requires them.
-
-  9. Don’t Use Error.message
-    - Avoid using Error.message in tests.
-    - Use Chai assertions instead (e.g., expect(error).to.equal('expected value') or expect(error).to.deep.equal(expected)).
-
-  10. Avoid Sending Incorrect Payloads (Unless Testing Error Cases)
-    - Only send invalid payloads if you are testing a negative scenario.
-    - For success scenarios, use valid input that matches all required columns.
-
-  11. Using the Correct ORM
-    - If the code uses Sequelize, do not generate TypeORM code.
-    - If it’s TypeORM, do not use Sequelize or mix references.
-
-  12. Use Necessary Columns When Inserting Data
-    - If inserting data, ensure the payload contains all necessary columns.
-
-  13. Use Correct Chai Expectations
-    - For example, expect(value).to.equal(...) or expect(value).to.deep.equal(...).
-    - Avoid incorrect syntax like expect.to(...).
-
-  14. Limit Use of any
-    - The test code must define or infer types whenever possible.
-
-  15. Avoid Flaky Tests
-    - Do not rely on timing delays or unpredictable external services.
-    - Keep tests deterministic and stable.
-
-  Final Note:
-  - The generated test file MUST run successfully in a TypeScript project using Mocha, Chai, and Sequelize.
-  - STRICTLY FOLLOW THESE INSTRUCTIONS OR THE OUTPUT WILL BE CONSIDERED INCORRECT.
-
-  NOW, GENERATE THE TEST.
+Components:
+API Path: ${apiPath}
+Route: ${routeCode}
+Controller: ${controllerCode}
+Use Case: ${useCaseCode}
+Repository (${repoName}): ${repositoryCode}
+Port: ${portCode}
+Entity: ${entityCode}
+DTO: ${dtoCode}
+SQL: ${sqlCode}
 `
 
   try {
@@ -358,34 +285,7 @@ async function generateTest(
   const unitPrompt = `
 STRICTLY FOLLOW THE INSTRUCTIONS BELOW WITHOUT EXCEPTION:
 
-Given the following TypeScript files, you MUST generate unit test cases for ONLY the specified Use Case:
-
-Use Case:
-\`\`\`typescript
-${useCaseCode}
-\`\`\`
-
-Repository: ${repoName}
-\`\`\`typescript
-${repositoryCode}
-\`\`\`
-
-Port:
-\`\`\`typescript
-${portCode}
-\`\`\`
-
-Entity:
-\`\`\`typescript
-${entityCode}
-\`\`\`
-
-DTO:
-\`\`\`typescript
-${dtoCode}
-\`\`\`
-
-YOU MUST GENERATE a complete and exhaustive set of unit tests consisting of a minimum of 20 test cases for the given use case in TypeScript. The test cases should focus on the logic of the use case and cover all relevant scenarios.
+YOU MUST GENERATE a complete and exhaustive set of unit tests consisting of more than 20 test cases for the given use case in TypeScript. The test cases should focus on the logic of the use case and cover all relevant scenarios.
 
 MANDATORY REQUIREMENTS (DO NOT IGNORE ANY):
 - The test MUST be written using Mocha as the test runner.
@@ -462,7 +362,35 @@ Final Note:
 - The generated test file MUST run successfully in a TypeScript project using Mocha, Chai.
 - STRICTLY FOLLOW THESE INSTRUCTIONS OR THE OUTPUT WILL BE CONSIDERED INCORRECT.
 
+Given the following TypeScript files, you MUST generate unit test cases for ONLY the specified Use Case:
+
+Use Case:
+\`\`\`typescript
+${useCaseCode}
+\`\`\`
+
+Repository: ${repoName}
+\`\`\`typescript
+${repositoryCode}
+\`\`\`
+
+Port:
+\`\`\`typescript
+${portCode}
+\`\`\`
+
+Entity:
+\`\`\`typescript
+${entityCode}
+\`\`\`
+
+DTO:
+\`\`\`typescript
+${dtoCode}
+\`\`\`
+
 NOW, GENERATE THE TEST.
+
 `
 
   try {
@@ -493,7 +421,19 @@ NOW, GENERATE THE TEST.
 
 // Step 19: Generate All Tests
 async function generateAllTests() {
-  for (const { name, apiPath, controller, useCase, repoName, repo, port, entity, dto, route } of detectedTestFiles) {
+  for (const {
+    name,
+    apiPath,
+    controller,
+    useCase,
+    repoName,
+    repo,
+    port,
+    entity,
+    dto,
+    route,
+    sql,
+  } of detectedTestFiles) {
     console.log(`Generating test for: ${name}`)
     console.log(`  apiPath: ${apiPath}`)
     console.log(`  Controller: ${controller}`)
@@ -515,6 +455,7 @@ async function generateAllTests() {
       entity || null,
       dto || null,
       route || null,
+      sql || null,
     )
   }
 }

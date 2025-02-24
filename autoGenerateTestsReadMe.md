@@ -307,11 +307,18 @@ const integrationPrompt = `
 const integrationResponse = await openai.chat.completions.create({
   model: "gpt-4o",
   messages: [{ role: "developer", content: integrationPrompt }],
+  temperature: 0.0,
+  top_p: 0.0,
+  frequency_penalty: 0,
+  presence_penalty: 0,
   ...
 })
 ```
-
-- Calls the GPT-4o model to produce an integration test file.
+- integrationResponse calls the GPT-4o model to produce an integration test file.
+- temperature controls randomness.
+- top_p sets the cumulative probability threshold for token selection.
+- frequency_penalty reduces the chance of repeating tokens that appear frequently.
+- presence_penalty reduces repetition of any token that has already appeared.
 
 ---
 
@@ -350,11 +357,19 @@ YOU MUST GENERATE a complete and exhaustive set of unit tests...
 const unitResponse = await openai.chat.completions.create({
   model: "gpt-4o",
   messages: [{ role: "developer", content: unitPrompt }],
+  temperature: 0.0,
+  top_p: 0.0,
+  frequency_penalty: 0,
+  presence_penalty: 0,
   ...
 })
 ```
 
-- Requests the GPT-4o model to generate the unit test code.
+- unitResponse calls the GPT-4o model to produce an unit test file.
+- temperature controls randomness.
+- top_p sets the cumulative probability threshold for token selection.
+- frequency_penalty reduces the chance of repeating tokens that appear frequently.
+- presence_penalty reduces repetition of any token that has already appeared.
 
 ---
 

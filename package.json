@@ -53,6 +53,7 @@
     "openai": "^4.84.0",
     "sequelize": "^6.21.4",
     "snowflake-sdk": "^1.7.0",
+    "sqlite3": "^5.1.7",
     "swagger-ui-express": "^5.0.1",
     "typeorm": "^0.3.20",
     "winston": "^3.8.1",

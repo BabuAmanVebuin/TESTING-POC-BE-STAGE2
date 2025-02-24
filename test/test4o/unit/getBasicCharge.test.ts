@@ -1,11 +1,13 @@
 import { expect } from 'chai';
 import { generateBasicChargeResponseUseCase } from '../../../src/application/use_cases/dpm/generateBasicChargeResponseUseCase';
 import { BasicChargeRepositoryPort } from '../../../src/application/port/repositories/dpm/BasicChargeRepositoryPort';
+import { getKpi003ResponseTimeRangeUseCase } from '../../../src/application/use_cases/dpm/getKpi003ResponseTimeRangeUseCase';
 import sinon from 'sinon';
 
 describe('generateBasicChargeResponseUseCase', () => {
   let basicChargeRepositoryMock: sinon.SinonStubbedInstance<BasicChargeRepositoryPort>;
   let tMock: sinon.SinonStub;
+  let getKpi003ResponseTimeRangeUseCaseMock: sinon.SinonStub;
 
   beforeEach(() => {
     basicChargeRepositoryMock = {
@@ -13,8 +15,7 @@ describe('generateBasicChargeResponseUseCase', () => {
     } as any;
 
     tMock = sinon.stub();
-    tMock.withArgs("VALUE.PREFIX_YEN").returns("¥");
-    tMock.withArgs("VALUE.SUFFIX_OKU").returns("Oku");
+    getKpi003ResponseTimeRangeUseCaseMock = sinon.stub();
   });
 
   afterEach(() => {
@@ -24,10 +25,17 @@ describe('generateBasicChargeResponseUseCase', () => {
   it('should generate BasicChargeJson successfully with valid inputs', async () => {
     const plantCode = 'PLANT1';
     const unitCode = 'UNIT1';
-    const timestamp = 1625097600;
-    const basicChargeData = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
+    const timestamp = 1622548800;
+    const expectedBasicCharge = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
 
-    basicChargeRepositoryMock.getBasicCharge.resolves(basicChargeData);
+    getKpi003ResponseTimeRangeUseCaseMock.returns({
+      annualEstimatesStart: { year: 2021 },
+    });
+
+    basicChargeRepositoryMock.getBasicCharge.resolves(expectedBasicCharge);
+
+    tMock.withArgs('VALUE.PREFIX_YEN').returns('¥');
+    tMock.withArgs('VALUE.SUFFIX_OKU').returns('Oku');
 
     const result = await generateBasicChargeResponseUseCase(
       plantCode,
@@ -40,19 +48,26 @@ describe('generateBasicChargeResponseUseCase', () => {
     expect(result).to.deep.equal({
       PlantCode: plantCode,
       UnitCode: unitCode,
-      Prefix: "¥",
-      Suffix: "Oku",
-      BasicCharge: basicChargeData,
+      Prefix: '¥',
+      Suffix: 'Oku',
+      BasicCharge: expectedBasicCharge,
     });
   });
 
-  it('should handle null unitCode and generate BasicChargeJson', async () => {
+  it('should handle null unitCode', async () => {
     const plantCode = 'PLANT1';
     const unitCode = null;
-    const timestamp = 1625097600;
-    const basicChargeData = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
+    const timestamp = 1622548800;
+    const expectedBasicCharge = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
 
-    basicChargeRepositoryMock.getBasicCharge.resolves(basicChargeData);
+    getKpi003ResponseTimeRangeUseCaseMock.returns({
+      annualEstimatesStart: { year: 2021 },
+    });
+
+    basicChargeRepositoryMock.getBasicCharge.resolves(expectedBasicCharge);
+
+    tMock.withArgs('VALUE.PREFIX_YEN').returns('¥');
+    tMock.withArgs('VALUE.SUFFIX_OKU').returns('Oku');
 
     const result = await generateBasicChargeResponseUseCase(
       plantCode,
@@ -65,18 +80,25 @@ describe('generateBasicChargeResponseUseCase', () => {
     expect(result).to.deep.equal({
       PlantCode: plantCode,
       UnitCode: unitCode,
-      Prefix: "¥",
-      Suffix: "Oku",
-      BasicCharge: basicChargeData,
+      Prefix: '¥',
+      Suffix: 'Oku',
+      BasicCharge: expectedBasicCharge,
     });
   });
 
   it('should throw an error if getBasicCharge fails', async () => {
     const plantCode = 'PLANT1';
     const unitCode = 'UNIT1';
-    const timestamp = 1625097600;
+    const timestamp = 1622548800;
+
+    getKpi003ResponseTimeRangeUseCaseMock.returns({
+      annualEstimatesStart: { year: 2021 },
+    });
 
     basicChargeRepositoryMock.getBasicCharge.rejects(new Error('Database error'));
+
+    tMock.withArgs('VALUE.PREFIX_YEN').returns('¥');
+    tMock.withArgs('VALUE.SUFFIX_OKU').returns('Oku');
 
     try {
       await generateBasicChargeResponseUseCase(
@@ -92,12 +114,19 @@ describe('generateBasicChargeResponseUseCase', () => {
     }
   });
 
-  it('should handle empty result from getBasicCharge', async () => {
+  it('should handle empty BasicCharge result', async () => {
     const plantCode = 'PLANT1';
     const unitCode = 'UNIT1';
-    const timestamp = 1625097600;
+    const timestamp = 1622548800;
+
+    getKpi003ResponseTimeRangeUseCaseMock.returns({
+      annualEstimatesStart: { year: 2021 },
+    });
 
     basicChargeRepositoryMock.getBasicCharge.resolves([]);
+
+    tMock.withArgs('VALUE.PREFIX_YEN').returns('¥');
+    tMock.withArgs('VALUE.SUFFIX_OKU').returns('Oku');
 
     const result = await generateBasicChargeResponseUseCase(
       plantCode,
@@ -110,46 +139,47 @@ describe('generateBasicChargeResponseUseCase', () => {
     expect(result).to.deep.equal({
       PlantCode: plantCode,
       UnitCode: unitCode,
-      Prefix: "¥",
-      Suffix: "Oku",
+      Prefix: '¥',
+      Suffix: 'Oku',
       BasicCharge: [],
     });
   });
 
-  it('should handle invalid timestamp gracefully', async () => {
+  it('should handle invalid timestamp', async () => {
     const plantCode = 'PLANT1';
     const unitCode = 'UNIT1';
     const timestamp = -1;
 
-    basicChargeRepositoryMock.getBasicCharge.resolves([]);
+    getKpi003ResponseTimeRangeUseCaseMock.throws(new Error('Invalid timestamp'));
 
-    const result = await generateBasicChargeResponseUseCase(
-      plantCode,
-      unitCode,
-      timestamp,
-      basicChargeRepositoryMock,
-      tMock
-    );
-
-    expect(result).to.deep.equal({
-      PlantCode: plantCode,
-      UnitCode: unitCode,
-      Prefix: "¥",
-      Suffix: "Oku",
-      BasicCharge: [],
-    });
+    try {
+      await generateBasicChargeResponseUseCase(
+        plantCode,
+        unitCode,
+        timestamp,
+        basicChargeRepositoryMock,
+        tMock
+      );
+    } catch (error) {
+      expect(error).to.be.an('error');
+      expect(error.message).to.equal('Invalid timestamp');
+    }
   });
 
-  it('should handle missing translation keys gracefully', async () => {
+  it('should handle missing translation keys', async () => {
     const plantCode = 'PLANT1';
     const unitCode = 'UNIT1';
-    const timestamp = 1625097600;
-    const basicChargeData = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
+    const timestamp = 1622548800;
+    const expectedBasicCharge = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
 
-    tMock.withArgs("VALUE.PREFIX_YEN").returns(undefined);
-    tMock.withArgs("VALUE.SUFFIX_OKU").returns(undefined);
+    getKpi003ResponseTimeRangeUseCaseMock.returns({
+      annualEstimatesStart: { year: 2021 },
+    });
 
-    basicChargeRepositoryMock.getBasicCharge.resolves(basicChargeData);
+    basicChargeRepositoryMock.getBasicCharge.resolves(expectedBasicCharge);
+
+    tMock.withArgs('VALUE.PREFIX_YEN').returns(undefined);
+    tMock.withArgs('VALUE.SUFFIX_OKU').returns(undefined);
 
     const result = await generateBasicChargeResponseUseCase(
       plantCode,
@@ -164,7 +194,7 @@ describe('generateBasicChargeResponseUseCase', () => {
       UnitCode: unitCode,
       Prefix: undefined,
       Suffix: undefined,
-      BasicCharge: basicChargeData,
+      BasicCharge: expectedBasicCharge,
     });
   });
 
@@ -172,9 +202,16 @@ describe('generateBasicChargeResponseUseCase', () => {
     const plantCode = 'PLANT1';
     const unitCode = 'UNIT1';
     const timestamp = 9999999999;
-    const basicChargeData = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
+    const expectedBasicCharge = [{ FiscalYear: 2286, Annual: 1000, Monthly: 100 }];
 
-    basicChargeRepositoryMock.getBasicCharge.resolves(basicChargeData);
+    getKpi003ResponseTimeRangeUseCaseMock.returns({
+      annualEstimatesStart: { year: 2286 },
+    });
+
+    basicChargeRepositoryMock.getBasicCharge.resolves(expectedBasicCharge);
+
+    tMock.withArgs('VALUE.PREFIX_YEN').returns('¥');
+    tMock.withArgs('VALUE.SUFFIX_OKU').returns('Oku');
 
     const result = await generateBasicChargeResponseUseCase(
       plantCode,
@@ -187,44 +224,26 @@ describe('generateBasicChargeResponseUseCase', () => {
     expect(result).to.deep.equal({
       PlantCode: plantCode,
       UnitCode: unitCode,
-      Prefix: "¥",
-      Suffix: "Oku",
-      BasicCharge: basicChargeData,
+      Prefix: '¥',
+      Suffix: 'Oku',
+      BasicCharge: expectedBasicCharge,
     });
   });
 
-  it('should handle zero timestamp value', async () => {
+  it('should handle zero timestamp', async () => {
     const plantCode = 'PLANT1';
     const unitCode = 'UNIT1';
     const timestamp = 0;
-    const basicChargeData = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
+    const expectedBasicCharge = [{ FiscalYear: 1970, Annual: 1000, Monthly: 100 }];
 
-    basicChargeRepositoryMock.getBasicCharge.resolves(basicChargeData);
-
-    const result = await generateBasicChargeResponseUseCase(
-      plantCode,
-      unitCode,
-      timestamp,
-      basicChargeRepositoryMock,
-      tMock
-    );
-
-    expect(result).to.deep.equal({
-      PlantCode: plantCode,
-      UnitCode: unitCode,
-      Prefix: "¥",
-      Suffix: "Oku",
-      BasicCharge: basicChargeData,
+    getKpi003ResponseTimeRangeUseCaseMock.returns({
+      annualEstimatesStart: { year: 1970 },
     });
-  });
 
-  it('should handle undefined unitCode', async () => {
-    const plantCode = 'PLANT1';
-    const unitCode = undefined;
-    const timestamp = 1625097600;
-    const basicChargeData = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
+    basicChargeRepositoryMock.getBasicCharge.resolves(expectedBasicCharge);
 
-    basicChargeRepositoryMock.getBasicCharge.resolves(basicChargeData);
+    tMock.withArgs('VALUE.PREFIX_YEN').returns('¥');
+    tMock.withArgs('VALUE.SUFFIX_OKU').returns('Oku');
 
     const result = await generateBasicChargeResponseUseCase(
       plantCode,
@@ -237,19 +256,49 @@ describe('generateBasicChargeResponseUseCase', () => {
     expect(result).to.deep.equal({
       PlantCode: plantCode,
       UnitCode: unitCode,
-      Prefix: "¥",
-      Suffix: "Oku",
-      BasicCharge: basicChargeData,
+      Prefix: '¥',
+      Suffix: 'Oku',
+      BasicCharge: expectedBasicCharge,
     });
   });
 
   it('should handle undefined plantCode', async () => {
     const plantCode = undefined;
     const unitCode = 'UNIT1';
-    const timestamp = 1625097600;
-    const basicChargeData = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
+    const timestamp = 1622548800;
 
-    basicChargeRepositoryMock.getBasicCharge.resolves(basicChargeData);
+    getKpi003ResponseTimeRangeUseCaseMock.returns({
+      annualEstimatesStart: { year: 2021 },
+    });
+
+    try {
+      await generateBasicChargeResponseUseCase(
+        plantCode,
+        unitCode,
+        timestamp,
+        basicChargeRepositoryMock,
+        tMock
+      );
+    } catch (error) {
+      expect(error).to.be.an('error');
+      expect(error.message).to.equal('Invalid plantCode');
+    }
+  });
+
+  it('should handle undefined unitCode', async () => {
+    const plantCode = 'PLANT1';
+    const unitCode = undefined;
+    const timestamp = 1622548800;
+    const expectedBasicCharge = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
+
+    getKpi003ResponseTimeRangeUseCaseMock.returns({
+      annualEstimatesStart: { year: 2021 },
+    });
+
+    basicChargeRepositoryMock.getBasicCharge.resolves(expectedBasicCharge);
+
+    tMock.withArgs('VALUE.PREFIX_YEN').returns('¥');
+    tMock.withArgs('VALUE.SUFFIX_OKU').returns('Oku');
 
     const result = await generateBasicChargeResponseUseCase(
       plantCode,
@@ -262,9 +311,9 @@ describe('generateBasicChargeResponseUseCase', () => {
     expect(result).to.deep.equal({
       PlantCode: plantCode,
       UnitCode: unitCode,
-      Prefix: "¥",
-      Suffix: "Oku",
-      BasicCharge: basicChargeData,
+      Prefix: '¥',
+      Suffix: 'Oku',
+      BasicCharge: expectedBasicCharge,
     });
   });
 
@@ -272,59 +321,83 @@ describe('generateBasicChargeResponseUseCase', () => {
     const plantCode = 'PLANT1';
     const unitCode = 'UNIT1';
     const timestamp = undefined;
-    const basicChargeData = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
 
-    basicChargeRepositoryMock.getBasicCharge.resolves(basicChargeData);
+    getKpi003ResponseTimeRangeUseCaseMock.throws(new Error('Invalid timestamp'));
 
-    const result = await generateBasicChargeResponseUseCase(
-      plantCode,
-      unitCode,
-      timestamp,
-      basicChargeRepositoryMock,
-      tMock
-    );
+    try {
+      await generateBasicChargeResponseUseCase(
+        plantCode,
+        unitCode,
+        timestamp,
+        basicChargeRepositoryMock,
+        tMock
+      );
+    } catch (error) {
+      expect(error).to.be.an('error');
+      expect(error.message).to.equal('Invalid timestamp');
+    }
+  });
 
-    expect(result).to.deep.equal({
-      PlantCode: plantCode,
-      UnitCode: unitCode,
-      Prefix: "¥",
-      Suffix: "Oku",
-      BasicCharge: basicChargeData,
+  it('should handle null plantCode', async () => {
+    const plantCode = null;
+    const unitCode = 'UNIT1';
+    const timestamp = 1622548800;
+
+    getKpi003ResponseTimeRangeUseCaseMock.returns({
+      annualEstimatesStart: { year: 2021 },
     });
+
+    try {
+      await generateBasicChargeResponseUseCase(
+        plantCode,
+        unitCode,
+        timestamp,
+        basicChargeRepositoryMock,
+        tMock
+      );
+    } catch (error) {
+      expect(error).to.be.an('error');
+      expect(error.message).to.equal('Invalid plantCode');
+    }
   });
 
   it('should handle empty plantCode', async () => {
     const plantCode = '';
     const unitCode = 'UNIT1';
-    const timestamp = 1625097600;
-    const basicChargeData = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
+    const timestamp = 1622548800;
 
-    basicChargeRepositoryMock.getBasicCharge.resolves(basicChargeData);
-
-    const result = await generateBasicChargeResponseUseCase(
-      plantCode,
-      unitCode,
-      timestamp,
-      basicChargeRepositoryMock,
-      tMock
-    );
-
-    expect(result).to.deep.equal({
-      PlantCode: plantCode,
-      UnitCode: unitCode,
-      Prefix: "¥",
-      Suffix: "Oku",
-      BasicCharge: basicChargeData,
+    getKpi003ResponseTimeRangeUseCaseMock.returns({
+      annualEstimatesStart: { year: 2021 },
     });
+
+    try {
+      await generateBasicChargeResponseUseCase(
+        plantCode,
+        unitCode,
+        timestamp,
+        basicChargeRepositoryMock,
+        tMock
+      );
+    } catch (error) {
+      expect(error).to.be.an('error');
+      expect(error.message).to.equal('Invalid plantCode');
+    }
   });
 
   it('should handle empty unitCode', async () => {
     const plantCode = 'PLANT1';
     const unitCode = '';
-    const timestamp = 1625097600;
-    const basicChargeData = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
+    const timestamp = 1622548800;
+    const expectedBasicCharge = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
 
-    basicChargeRepositoryMock.getBasicCharge.resolves(basicChargeData);
+    getKpi003ResponseTimeRangeUseCaseMock.returns({
+      annualEstimatesStart: { year: 2021 },
+    });
+
+    basicChargeRepositoryMock.getBasicCharge.resolves(expectedBasicCharge);
+
+    tMock.withArgs('VALUE.PREFIX_YEN').returns('¥');
+    tMock.withArgs('VALUE.SUFFIX_OKU').returns('Oku');
 
     const result = await generateBasicChargeResponseUseCase(
       plantCode,
@@ -337,9 +410,9 @@ describe('generateBasicChargeResponseUseCase', () => {
     expect(result).to.deep.equal({
       PlantCode: plantCode,
       UnitCode: unitCode,
-      Prefix: "¥",
-      Suffix: "Oku",
-      BasicCharge: basicChargeData,
+      Prefix: '¥',
+      Suffix: 'Oku',
+      BasicCharge: expectedBasicCharge,
     });
   });
 
@@ -347,117 +420,94 @@ describe('generateBasicChargeResponseUseCase', () => {
     const plantCode = 'PLANT1';
     const unitCode = 'UNIT1';
     const timestamp = '';
-    const basicChargeData = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
 
-    basicChargeRepositoryMock.getBasicCharge.resolves(basicChargeData);
-
-    const result = await generateBasicChargeResponseUseCase(
-      plantCode,
-      unitCode,
-      timestamp,
-      basicChargeRepositoryMock,
-      tMock
-    );
-
-    expect(result).to.deep.equal({
-      PlantCode: plantCode,
-      UnitCode: unitCode,
-      Prefix: "¥",
-      Suffix: "Oku",
-      BasicCharge: basicChargeData,
-    });
-  });
-
-  it('should handle null plantCode', async () => {
-    const plantCode = null;
-    const unitCode = 'UNIT1';
-    const timestamp = 1625097600;
-    const basicChargeData = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
-
-    basicChargeRepositoryMock.getBasicCharge.resolves(basicChargeData);
-
-    const result = await generateBasicChargeResponseUseCase(
-      plantCode,
-      unitCode,
-      timestamp,
-      basicChargeRepositoryMock,
-      tMock
-    );
-
-    expect(result).to.deep.equal({
-      PlantCode: plantCode,
-      UnitCode: unitCode,
-      Prefix: "¥",
-      Suffix: "Oku",
-      BasicCharge: basicChargeData,
-    });
-  });
-
-  it('should handle null timestamp', async () => {
-    const plantCode = 'PLANT1';
-    const unitCode = 'UNIT1';
-    const timestamp = null;
-    const basicChargeData = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
-
-    basicChargeRepositoryMock.getBasicCharge.resolves(basicChargeData);
-
-    const result = await generateBasicChargeResponseUseCase(
-      plantCode,
-      unitCode,
-      timestamp,
-      basicChargeRepositoryMock,
-      tMock
-    );
-
-    expect(result).to.deep.equal({
-      PlantCode: plantCode,
-      UnitCode: unitCode,
-      Prefix: "¥",
-      Suffix: "Oku",
-      BasicCharge: basicChargeData,
-    });
-  });
-
-  it('should handle missing translation function', async () => {
-    const plantCode = 'PLANT1';
-    const unitCode = 'UNIT1';
-    const timestamp = 1625097600;
-    const basicChargeData = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
-
-    basicChargeRepositoryMock.getBasicCharge.resolves(basicChargeData);
-
-    const result = await generateBasicChargeResponseUseCase(
-      plantCode,
-      unitCode,
-      timestamp,
-      basicChargeRepositoryMock,
-      undefined
-    );
-
-    expect(result).to.deep.equal({
-      PlantCode: plantCode,
-      UnitCode: unitCode,
-      Prefix: undefined,
-      Suffix: undefined,
-      BasicCharge: basicChargeData,
-    });
-  });
-
-  it('should handle missing repository', async () => {
-    const plantCode = 'PLANT1';
-    const unitCode = 'UNIT1';
-    const timestamp = 1625097600;
+    getKpi003ResponseTimeRangeUseCaseMock.throws(new Error('Invalid timestamp'));
 
     try {
       await generateBasicChargeResponseUseCase(
         plantCode,
         unitCode,
         timestamp,
-        undefined,
+        basicChargeRepositoryMock,
         tMock
       );
     } catch (error) {
       expect(error).to.be.an('error');
+      expect(error.message).to.equal('Invalid timestamp');
+    }
+  });
+
+  it('should handle null timestamp', async () => {
+    const plantCode = 'PLANT1';
+    const unitCode = 'UNIT1';
+    const timestamp = null;
+
+    getKpi003ResponseTimeRangeUseCaseMock.throws(new Error('Invalid timestamp'));
+
+    try {
+      await generateBasicChargeResponseUseCase(
+        plantCode,
+        unitCode,
+        timestamp,
+        basicChargeRepositoryMock,
+        tMock
+      );
+    } catch (error) {
+      expect(error).to.be.an('error');
+      expect(error.message).to.equal('Invalid timestamp');
+    }
+  });
+
+  it('should handle missing getBasicCharge method', async () => {
+    const plantCode = 'PLANT1';
+    const unitCode = 'UNIT1';
+    const timestamp = 1622548800;
+
+    getKpi003ResponseTimeRangeUseCaseMock.returns({
+      annualEstimatesStart: { year: 2021 },
+    });
+
+    basicChargeRepositoryMock.getBasicCharge = undefined;
+
+    try {
+      await generateBasicChargeResponseUseCase(
+        plantCode,
+        unitCode,
+        timestamp,
+        basicChargeRepositoryMock,
+        tMock
+      );
+    } catch (error) {
+      expect(error).to.be.an('error');
+      expect(error.message).to.equal('getBasicCharge is not a function');
+    }
+  });
+
+  it('should handle missing translation function', async () => {
+    const plantCode = 'PLANT1';
+    const unitCode = 'UNIT1';
+    const timestamp = 1622548800;
+    const expectedBasicCharge = [{ FiscalYear: 2021, Annual: 1000, Monthly: 100 }];
+
+    getKpi003ResponseTimeRangeUseCaseMock.returns({
+      annualEstimatesStart: { year: 2021 },
+    });
+
+    basicChargeRepositoryMock.getBasicCharge.resolves(expectedBasicCharge);
+
+    tMock = undefined;
+
+    try {
+      await generateBasicChargeResponseUseCase(
+        plantCode,
+        unitCode,
+        timestamp,
+        basicChargeRepositoryMock,
+        tMock
+      );
+    } catch (error) {
+      expect(error).to.be.an('error');
+      expect(error.message).to.equal('t is not a function');
     }
   });
 });
